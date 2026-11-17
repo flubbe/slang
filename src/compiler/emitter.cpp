@@ -372,8 +372,12 @@ void export_table_builder::add_struct(
         [&emitter](
           const ty::field_info& info) -> std::pair<std::string, module_::field_descriptor>
         {
-            const ty::type_info& base_type_info = emitter.type_ctx.get_type_info(
-              emitter.type_ctx.get_base_type(info.type));
+            auto base_type_id = ty::throw_or(
+              emitter.type_ctx.get_base_type(info.type),
+              std::format("Could not get base type of type id '{}'.", info.type));
+            const ty::type_info& base_type_info = ty::throw_or(
+              emitter.type_ctx.get_type_info(base_type_id),
+              std::format("Type with id '{}' not found.", base_type_id));
             std::string base_type;
             std::optional<std::size_t> field_type_import_index{std::nullopt};
 
@@ -647,8 +651,9 @@ void instruction_emitter::collect_imports()
                 symbol_info.name)};
         }
 
-        const auto& type_info = type_ctx.get_type_info(
-          type_id.value());
+        const auto& type_info = ty::throw_or(
+          type_ctx.get_type_info(type_id.value()),
+          std::format("Type with id '{}' not found.", type_id.value()));
 
         imports.intern_struct(
           symbol_info.qualified_name);
@@ -656,7 +661,9 @@ void instruction_emitter::collect_imports()
         const auto& struct_info = std::get<ty::struct_info>(type_info.data);
         for(const auto& field_info: struct_info.fields)
         {
-            const auto& field_type_info = type_ctx.get_type_info(field_info.type);
+            const auto& field_type_info = ty::throw_or(
+              type_ctx.get_type_info(field_info.type),
+              std::format("Type with id '{}' not found.", field_info.type));
             if(field_type_info.kind != ty::type_kind::struct_)
             {
                 continue;
@@ -695,7 +702,9 @@ void instruction_emitter::collect_imports()
                     f->get_name()));
             }
 
-            ty::type_info info = type_ctx.get_type_info(id.value());
+            ty::type_info info = ty::throw_or(
+              type_ctx.get_type_info(id.value()),
+              std::format("Type with id '{}' not found.", id.value()));
             if(info.kind == ty::type_kind::struct_)
             {
                 const auto& struct_info = std::get<ty::struct_info>(info.data);
@@ -717,7 +726,9 @@ void instruction_emitter::collect_imports()
                     f->get_name()));
             }
 
-            ty::type_info info = type_ctx.get_type_info(id.value());
+            ty::type_info info = ty::throw_or(
+              type_ctx.get_type_info(id.value()),
+              std::format("Type with id '{}' not found.", id.value()));
             if(info.kind == ty::type_kind::struct_)
             {
                 const auto& struct_info = std::get<ty::struct_info>(info.data);
@@ -738,7 +749,11 @@ void instruction_emitter::collect_imports()
                 f->get_name()));
         }
 
-        ty::type_info return_type_info = type_ctx.get_type_info(return_type_id.value());
+        ty::type_info return_type_info = ty::throw_or(
+          type_ctx.get_type_info(return_type_id.value()),
+          std::format(
+            "Type with id '{}' not found.",
+            return_type_id.value()));
         if(return_type_info.kind == ty::type_kind::struct_)
         {
             const auto& struct_info = std::get<ty::struct_info>(return_type_info.data);
@@ -817,7 +832,11 @@ void instruction_emitter::collect_imports()
                             ::cg::to_string(lowered_type.get_type_kind())));
                     }
 
-                    auto info = type_ctx.get_type_info(lowered_type.get_type_id().value());
+                    auto info = ty::throw_or(
+                      type_ctx.get_type_info(lowered_type.get_type_id().value()),
+                      std::format(
+                        "Type with id '{}' not found.",
+                        lowered_type.get_type_id().value()));
                     if(info.kind == ty::type_kind::struct_)
                     {
                         const auto& struct_info = std::get<ty::struct_info>(info.data);
@@ -853,8 +872,14 @@ static std::optional<std::size_t> get_import_index_or_nullopt(
           "Type had no id during emission.");
     }
 
-    auto info = type_ctx.get_type_info(
-      type_ctx.get_base_type(t.get_type_id().value()));
+    const auto base_type_id = ty::throw_or(
+      type_ctx.get_base_type(t.get_type_id().value()),
+      std::format(
+        "Could not get base type of type id '{}'.",
+        t.get_type_id().value()));
+    auto info = ty::throw_or(
+      type_ctx.get_type_info(base_type_id),
+      std::format("Type with id '{}' not found.", base_type_id));
 
     if(info.kind != ty::type_kind::struct_)
     {
@@ -1510,8 +1535,9 @@ void instruction_emitter::emit_instruction(
         vle_int struct_index{0};
         vle_int field_index{utils::numeric_cast<std::int64_t>(arg->get_field_index())};
 
-        auto struct_type_info = type_ctx.get_type_info(
-          arg->get_struct_type_id());
+        auto struct_type_info = ty::throw_or(
+          type_ctx.get_type_info(arg->get_struct_type_id()),
+          std::format("Type with id '{}' not found.", arg->get_struct_type_id()));
         if(struct_type_info.kind != ty::type_kind::struct_)
         {
             throw emitter_error(
@@ -1541,8 +1567,9 @@ void instruction_emitter::emit_instruction(
         }
         else
         {
-            auto info = type_ctx.get_type_info(
-              arg->get_struct_type_id());
+            auto info = ty::throw_or(
+              type_ctx.get_type_info(arg->get_struct_type_id()),
+              std::format("Type with id '{}' not found.", arg->get_struct_type_id()));
             if(info.kind != ty::type_kind::struct_)
             {
                 throw emitter_error(
@@ -1788,8 +1815,9 @@ void instruction_emitter::emit_instruction(
         // resolve type to index.
         vle_int struct_index{0};
 
-        auto struct_type_info = type_ctx.get_type_info(
-          type.get_type_id().value());
+        auto struct_type_info = ty::throw_or(
+          type_ctx.get_type_info(type.get_type_id().value()),
+          std::format("Type with id '{}' not found.", type.get_type_id().value()));
         if(struct_type_info.kind != ty::type_kind::struct_)
         {
             throw emitter_error(
@@ -2073,8 +2101,9 @@ void instruction_emitter::run()
                 symbol_info.name)};
         }
 
-        const auto& type_info = type_ctx.get_type_info(
-          type_id.value());
+        const auto& type_info = ty::throw_or(
+          type_ctx.get_type_info(type_id.value()),
+          std::format("Type with id '{}' not found.", type_id.value()));
 
         const auto& struct_info = std::get<ty::struct_info>(type_info.data);
         exports.add_struct(*this, struct_info);
@@ -2094,9 +2123,13 @@ void instruction_emitter::run()
         }
 
         auto type_id = signature_ret_type.get_type_id().value();
-        auto base_type_id = type_ctx.get_base_type(type_id);
+        auto base_type_id = ty::throw_or(
+          type_ctx.get_base_type(type_id),
+          std::format("Could not get base type of type id '{}'.", type_id));
         bool is_array = type_ctx.is_array(type_id);
-        auto array_rank = type_ctx.get_array_rank(type_id);
+        auto array_rank = ty::throw_or(
+          type_ctx.get_array_rank(type_id),
+          std::format("Could not get array rank of type id '{}'.", type_id));
 
         module_::variable_type return_type = {
           type_ctx.to_string(base_type_id),
@@ -2116,9 +2149,13 @@ void instruction_emitter::run()
             [this](const cg::type& t) -> module_::variable_type
             { 
                 auto type_id = t.get_type_id().value();
-                auto base_type_id = type_ctx.get_base_type(type_id);
+                auto base_type_id = ty::throw_or(
+                  type_ctx.get_base_type(type_id),
+                  std::format("Could not get base type of type id '{}'.", type_id));
                 bool is_array = type_ctx.is_array(type_id);
-                auto array_rank = type_ctx.get_array_rank(type_id);
+                auto array_rank = ty::throw_or(
+                  type_ctx.get_array_rank(type_id),
+                  std::format("Could not get array rank of type id '{}'.", type_id));
                 
                 return {
                     type_ctx.to_string(base_type_id),
@@ -2224,9 +2261,13 @@ void instruction_emitter::run()
             }
 
             auto type_id = ty.get_type_id().value();
-            auto base_type_id = type_ctx.get_base_type(type_id);
+            auto base_type_id = ty::throw_or(
+              type_ctx.get_base_type(type_id),
+              std::format("Could not get base type of type id '{}'.", type_id));
             bool is_array = type_ctx.is_array(type_id);
-            auto array_rank = type_ctx.get_array_rank(type_id);
+            auto array_rank = ty::throw_or(
+              type_ctx.get_array_rank(type_id),
+              std::format("Could not get array rank of type id '{}'.", type_id));
 
             locals[index] = module_::variable_descriptor{
               module_::variable_type{
@@ -2276,9 +2317,13 @@ void instruction_emitter::run()
             }
 
             auto type_id = ty.get_type_id().value();
-            auto base_type_id = type_ctx.get_base_type(type_id);
+            auto base_type_id = ty::throw_or(
+              type_ctx.get_base_type(type_id),
+              std::format("Could not get base type of type id '{}'.", type_id));
             bool is_array = type_ctx.is_array(type_id);
-            auto array_rank = type_ctx.get_array_rank(type_id);
+            auto array_rank = ty::throw_or(
+              type_ctx.get_array_rank(type_id),
+              std::format("Could not get array rank of type id '{}'.", type_id));
 
             locals[index] = module_::variable_descriptor{
               module_::variable_type{

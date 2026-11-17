@@ -81,7 +81,12 @@ cg::type context::deref(const cg::type& type)
             type_ctx.to_string(type.get_type_id().value())));
     }
 
-    return lower(type_ctx.get_base_type(type.get_type_id().value()));
+    return lower(
+      ty::throw_or(
+        type_ctx.get_base_type(type.get_type_id().value()),
+        std::format(
+          "Could not get base type of type id '{}'.",
+          type.get_type_id().value())));
 }
 
 type_class context::get_type_class(const cg::type& type) const
@@ -113,7 +118,9 @@ std::string context::to_string() const
 
     for(const auto& [front_end_type, back_end_type]: type_cache)
     {
-        auto type_info = type_ctx.get_type_info(front_end_type);
+        auto type_info = ty::throw_or(
+          type_ctx.get_type_info(front_end_type),
+          std::format("Type with id '{}' not found.", front_end_type));
         if(type_info.kind != ty::type_kind::struct_)
         {
             continue;

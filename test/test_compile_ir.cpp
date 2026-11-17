@@ -108,7 +108,12 @@ public:
       std::size_t field_index) const override
     {
         auto info = type_ctx.get_struct_info(type_id);
-        return info.fields.at(field_index).name;
+        if(info == nullptr)
+        {
+            throw std::runtime_error("Struct info not found.");
+        }
+
+        return info->fields.at(field_index).name;
     }
 
     [[nodiscard]]

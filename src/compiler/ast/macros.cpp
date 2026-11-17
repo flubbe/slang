@@ -439,7 +439,7 @@ std::optional<ty::type_id> macro_invocation::type_check(
         expr_type = return_type;
     }
 
-    ctx.set_expression_type(*this, expr_type);
+    ctx.set_expression_type_or_throw(*this, expr_type);
 
     return expr_type;
 }

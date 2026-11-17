@@ -880,7 +880,7 @@ std::optional<ty::type_id> literal_expression::type_check(
             std::to_underlying(tok.type)));
     }
 
-    ctx.set_expression_type(*this, expr_type);
+    ctx.set_expression_type_or_throw(*this, expr_type);
 
     return expr_type;
 }
@@ -1307,7 +1307,7 @@ std::optional<ty::type_id> type_cast_expression::type_check(
             throw;
         }
     }();
-    ctx.set_expression_type(*this, expr_type);
+    ctx.set_expression_type_or_throw(*this, expr_type);
 
     return expr_type;
 }
@@ -1386,7 +1386,7 @@ std::optional<ty::type_id> namespace_access_expression::type_check(
           loc,
           "Type check: Expression has no type in namespace access.");
     }
-    ctx.set_expression_type(*this, expr_type);
+    ctx.set_expression_type_or_throw(*this, expr_type);
     return expr_type;
 }
 
@@ -1584,7 +1584,16 @@ std::optional<ty::type_id> access_expression::type_check(
 
     if(ctx.is_struct(type.value()))
     {
-        struct_info = ctx.get_struct_info(type.value());
+        const ty::struct_info* si = ctx.get_struct_info(type.value());
+        if(si == nullptr)
+        {
+            throw ty::type_error(
+              loc,
+              std::format(
+                "Type '{}' is not a struct.",
+                ctx.to_string(type.value())));
+        }
+        struct_info = *si;
     }
     struct_type = type;    // includes arrays.
 
@@ -1599,9 +1608,29 @@ std::optional<ty::type_id> access_expression::type_check(
     }
 
     const auto* identifier_node = rhs->as_variable_reference();
-    field_index = ctx.get_field_index(type.value(), identifier_node->get_name());
-    expr_type = ctx.get_field_type(type.value(), field_index);
-    ctx.set_expression_type(*this, expr_type);
+    std::optional<std::size_t> fi = ctx.get_field_index(type.value(), identifier_node->get_name());
+    if(!fi.has_value())
+    {
+        throw ty::type_error(
+          loc,
+          std::format(
+            "No field '{}' found in struct '{}'.",
+            identifier_node->get_name(),
+            ctx.to_string(type.value())));
+    }
+    field_index = fi.value();
+    std::optional<ty::type_id> ft = ctx.get_field_type(type.value(), field_index);
+    if(!ft.has_value())
+    {
+        throw ty::type_error(
+          loc,
+          std::format(
+            "No field type found for field '{}' in struct '{}'.",
+            identifier_node->get_name(),
+            ctx.to_string(type.value())));
+    }
+    expr_type = ft.value();
+    ctx.set_expression_type_or_throw(*this, expr_type);
 
     return expr_type;
 }
@@ -1845,7 +1874,7 @@ std::optional<ty::type_id> directive_expression::type_check(
     expr_type = expr->type_check(ctx, env);
     if(expr_type.has_value())
     {
-        ctx.set_expression_type(*this, expr_type);
+        ctx.set_expression_type_or_throw(*this, expr_type);
     }
     return expr_type;
 }
@@ -2184,7 +2213,7 @@ std::optional<ty::type_id> variable_reference_expression::type_check(
     }();
 
     expr_type = type;
-    ctx.set_expression_type(*this, expr_type);
+    ctx.set_expression_type_or_throw(*this, expr_type);
 
     return expr_type;
 }
@@ -2270,7 +2299,7 @@ std::optional<ty::type_id> array_subscript_expression::type_check(
     {
         throw ty::type_error(
           lhs->get_location(),
-          "Eexpression has no type.");
+          "Expression has no type.");
     }
 
     if(!ctx.is_array(lhs_type.value()))
@@ -2301,7 +2330,7 @@ std::optional<ty::type_id> array_subscript_expression::type_check(
     }
 
     expr_type = ctx.array_element_type(lhs_type.value());
-    ctx.set_expression_type(*this, expr_type);
+    ctx.set_expression_type_or_throw(*this, expr_type);
 
     return expr_type;
 }
@@ -2336,7 +2365,17 @@ void type_expression::type_check(
 
     if(array)
     {
-        type_id = ctx.get_array(type_id, 1);
+        auto array_type_id = ctx.get_array(type_id, 1);
+        if(!array_type_id.value())
+        {
+            throw ty::type_error{
+              get_location(),
+              std::format(
+                "Could not create array type from '{}'.",
+                get_qualified_name())};
+        }
+
+        type_id = array_type_id.value();
     }
 }
 
@@ -2506,7 +2545,7 @@ std::optional<ty::type_id> variable_declaration_expression::type_check(
               "Expression has no type.");
         }
 
-        ctx.set_expression_type(*expr.get(), rhs);
+        ctx.set_expression_type_or_throw(*expr.get(), rhs);
 
         if(!ctx.are_types_compatible(annotated_type_id.value(), rhs.value()))
         {
@@ -2522,7 +2561,7 @@ std::optional<ty::type_id> variable_declaration_expression::type_check(
     }
 
     expr_type = annotated_type_id;
-    ctx.set_expression_type(*this, expr_type);
+    ctx.set_expression_type_or_throw(*this, expr_type);
 
     return expr_type;
 }
@@ -2832,7 +2871,7 @@ std::optional<ty::type_id> array_initializer_expression::type_check(
     }
 
     expr_type = ctx.get_array(element_type.value(), 1);
-    ctx.set_expression_type(*this, expr_type);
+    ctx.set_expression_type_or_throw(*this, expr_type);
 
     return expr_type;
 }
@@ -2901,20 +2940,26 @@ void struct_definition_expression::declare_type(ty::context& ctx, sema::env& env
     }
 
     struct_type_id = ctx.declare_struct(get_name(), std::nullopt);
-    auto& struct_info = ctx.get_struct_info(struct_type_id);
+    ty::struct_info* si = ctx.get_struct_info(struct_type_id);
+    if(si == nullptr)
+    {
+        throw ty::type_error(
+          loc,
+          std::format("Failed to declare struct '{}'.", get_name()));
+    }
 
     if(env.has_attribute(
          symbol_id.value(),
          attribs::attribute_kind::allow_cast))
     {
-        struct_info.allow_cast = true;
+        si->allow_cast = true;
     }
 
     if(env.has_attribute(
          symbol_id.value(),
          attribs::attribute_kind::native))
     {
-        struct_info.native = true;
+        si->native = true;
     }
 }
 
@@ -3086,23 +3131,31 @@ std::optional<ty::type_id> struct_anonymous_initializer_expression::type_check(
             get_qualified_name())};
     }
 
-    const auto& struct_info = ctx.get_struct_info(struct_type_id.value());
+    const ty::struct_info* si = ctx.get_struct_info(struct_type_id.value());
+    if(si == nullptr)
+    {
+        throw ty::type_error{
+          get_location(),
+          std::format(
+            "Type '{}' not found.",
+            get_qualified_name())};
+    }
 
-    if(initializers.size() != struct_info.fields.size())
+    if(initializers.size() != si->fields.size())
     {
         throw ty::type_error(
           name.location,
           std::format(
             "Struct '{}' has {} member(s), but {} are initialized.",
             name.s,
-            struct_info.fields.size(),
+            si->fields.size(),
             initializers.size()));
     }
 
     for(std::size_t i = 0; i < initializers.size(); ++i)
     {
         const auto& initializer = initializers[i];
-        const auto& field = struct_info.fields[i];
+        const auto& field = si->fields[i];
 
         auto initializer_type = initializer->type_check(ctx, env);
         if(!initializer_type.has_value())
@@ -3131,7 +3184,7 @@ std::optional<ty::type_id> struct_anonymous_initializer_expression::type_check(
     }
 
     expr_type = struct_type_id;
-    ctx.set_expression_type(*this, expr_type);
+    ctx.set_expression_type_or_throw(*this, expr_type);
 
     return expr_type;
 }
@@ -3309,7 +3362,17 @@ std::optional<ty::type_id> struct_named_initializer_expression::type_check(
             get_qualified_name())};
     }
 
-    const ty::struct_info& info = ctx.get_struct_info(struct_type_id.value());
+    const ty::struct_info* si = ctx.get_struct_info(struct_type_id.value());
+    if(si == nullptr)
+    {
+        throw ty::type_error{
+          get_location(),
+          std::format(
+            "Type '{}' not found.",
+            get_qualified_name())};
+    }
+
+    const ty::struct_info& info = *si;
 
     if(info.fields.size() != initializers.size())
     {
@@ -3392,7 +3455,7 @@ std::optional<ty::type_id> struct_named_initializer_expression::type_check(
     }
 
     expr_type = struct_type_id;
-    ctx.set_expression_type(*this, expr_type);
+    ctx.set_expression_type_or_throw(*this, expr_type);
 
     return expr_type;
 }
@@ -3689,7 +3752,7 @@ std::optional<ty::type_id> assignment_expression::type_check(
 
         // set the restricted type.
         expr_type = lhs_type;
-        ctx.set_expression_type(*this, expr_type);
+        ctx.set_expression_type_or_throw(*this, expr_type);
         return expr_type;
     }
 
@@ -3732,7 +3795,7 @@ std::optional<ty::type_id> assignment_expression::type_check(
 
         // set the restricted type.
         expr_type = lhs_type;
-        ctx.set_expression_type(*this, expr_type);
+        ctx.set_expression_type_or_throw(*this, expr_type);
         return expr_type;
     }
 
@@ -3753,7 +3816,7 @@ std::optional<ty::type_id> assignment_expression::type_check(
 
         // set the restricted type.
         expr_type = ctx.get_i32_type();
-        ctx.set_expression_type(*this, expr_type);
+        ctx.set_expression_type_or_throw(*this, expr_type);
         return expr_type;
     }
 
@@ -3778,13 +3841,13 @@ std::optional<ty::type_id> assignment_expression::type_check(
         {
             // assignments return the type of the l.h.s.
             expr_type = lhs_type;
-            ctx.set_expression_type(*this, expr_type);
+            ctx.set_expression_type_or_throw(*this, expr_type);
             return expr_type;
         }
 
         // comparisons return i32.
         expr_type = ctx.get_i32_type();
-        ctx.set_expression_type(*this, expr_type);
+        ctx.set_expression_type_or_throw(*this, expr_type);
         return expr_type;
     }
 
@@ -3831,7 +3894,7 @@ std::optional<ty::type_id> assignment_expression::type_check(
     }
 
     expr_type = lhs_type;
-    ctx.set_expression_type(*this, expr_type);
+    ctx.set_expression_type_or_throw(*this, expr_type);
 
     return expr_type;
 }
@@ -4262,7 +4325,7 @@ std::optional<ty::type_id> binary_expression::type_check(
 
         // set the restricted type.
         expr_type = lhs_type;
-        ctx.set_expression_type(*this, expr_type);
+        ctx.set_expression_type_or_throw(*this, expr_type);
         return expr_type;
     }
 
@@ -4305,7 +4368,7 @@ std::optional<ty::type_id> binary_expression::type_check(
 
         // set the restricted type.
         expr_type = lhs_type;
-        ctx.set_expression_type(*this, expr_type);
+        ctx.set_expression_type_or_throw(*this, expr_type);
         return expr_type;
     }
 
@@ -4326,7 +4389,7 @@ std::optional<ty::type_id> binary_expression::type_check(
 
         // set the restricted type.
         expr_type = ctx.get_i32_type();
-        ctx.set_expression_type(*this, expr_type);
+        ctx.set_expression_type_or_throw(*this, expr_type);
         return expr_type;
     }
 
@@ -4348,7 +4411,7 @@ std::optional<ty::type_id> binary_expression::type_check(
 
         // comparisons return i32.
         expr_type = ctx.get_i32_type();
-        ctx.set_expression_type(*this, expr_type);
+        ctx.set_expression_type_or_throw(*this, expr_type);
         return expr_type;
     }
 
@@ -4405,7 +4468,7 @@ std::optional<ty::type_id> binary_expression::type_check(
         expr_type = lhs_type;
     }
 
-    ctx.set_expression_type(*this, expr_type);
+    ctx.set_expression_type_or_throw(*this, expr_type);
     return expr_type;
 }
 
@@ -4740,7 +4803,7 @@ std::optional<ty::type_id> unary_expression::type_check(
     }
 
     expr_type = operand_type;
-    ctx.set_expression_type(*this, expr_type);
+    ctx.set_expression_type_or_throw(*this, expr_type);
 
     return expr_type;
 }
@@ -4872,7 +4935,7 @@ std::optional<ty::type_id> new_expression::type_check(
     }
 
     expr_type = ctx.get_array(type_expr_id.value(), 1);
-    ctx.set_expression_type(*this, expr_type);
+    ctx.set_expression_type_or_throw(*this, expr_type);
 
     return expr_type;
 }
@@ -4907,7 +4970,7 @@ std::optional<ty::type_id> null_expression::type_check(
   [[maybe_unused]] sema::env& env)
 {
     expr_type = ctx.get_null_type();
-    ctx.set_expression_type(*this, expr_type);
+    ctx.set_expression_type_or_throw(*this, expr_type);
 
     return expr_type;
 }
@@ -5079,7 +5142,7 @@ std::optional<ty::type_id> postfix_expression::type_check(
     }
 
     expr_type = identifier_type;
-    ctx.set_expression_type(*this, expr_type);
+    ctx.set_expression_type_or_throw(*this, expr_type);
 
     return expr_type;
 }
@@ -5185,7 +5248,11 @@ void prototype_ast::declare(ty::context& ctx, sema::env& env)
 
     if(return_type->is_array())
     {
-        return_type_id = ctx.get_array(return_type_id, 1);
+        return_type_id = ty::throw_or(
+          ctx.get_array(return_type_id, 1),
+          std::format(
+            "Could not get array type for '{}'.",
+            return_type->get_qualified_name()));
     }
 }
 
@@ -5333,7 +5400,7 @@ std::optional<ty::type_id> block::type_check(
     }
 
     expr_type = exprs.empty() ? std::nullopt : exprs.back()->type_check(ctx, env);
-    ctx.set_expression_type(*this, expr_type);
+    ctx.set_expression_type_or_throw(*this, expr_type);
 
     return expr_type;
 }
@@ -5793,28 +5860,32 @@ std::optional<ty::type_id> call_expression::type_check(
 
         auto desc = std::get<module_::function_descriptor>(exp_sym->desc);
 
-        std::string type_str = resolve_type_name(
+        std::string qualified_type_str = resolve_type_name(
           loc,
           ctx,
           env,
           callee_symbol_info.declaring_module,
           desc.signature.return_type.base_type());
 
-        auto type = ctx.get_type(type_str);
+        auto type = ctx.get_type(qualified_type_str);
         if(!type.has_value())
         {
             throw ty::type_error{
               loc,
               std::format(
                 "Type '{}' not found.",
-                type_str)};
+                qualified_type_str)};
         }
 
         return_type = type.value();
 
         if(desc.signature.return_type.is_array())
         {
-            return_type = ctx.get_array(return_type, 1);
+            return_type = ty::throw_or(
+              ctx.get_array(return_type, 1),
+              std::format(
+                "Could not get array type for '{}'.",
+                qualified_type_str));
         }
 
         if(desc.signature.arg_types.size() != args.size())
@@ -5903,7 +5974,7 @@ std::optional<ty::type_id> call_expression::type_check(
     }
 
     is_void_return_type = expr_type.value() == ctx.get_void_type();
-    ctx.set_expression_type(*this, expr_type);
+    ctx.set_expression_type_or_throw(*this, expr_type);
 
     return expr_type;
 }
@@ -6046,7 +6117,7 @@ std::optional<ty::type_id> return_statement::type_check(
     }
 
     expr_type = std::nullopt;
-    ctx.set_expression_type(*this, expr_type);
+    ctx.set_expression_type_or_throw(*this, expr_type);
 
     return expr_type;
 }
