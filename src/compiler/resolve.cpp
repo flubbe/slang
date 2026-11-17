@@ -284,12 +284,13 @@ void context::import_type(
         if(!member_type_id.has_value())
         {
             get_diagnostics().report_error(
-                std::nullopt,
-                std::nullopt,
-                std::format("unknown type '{}' in struct '{}' of imported module '{}'",
-                             m.second.base_type.base_type(),
-                             symbol.name,
-                             module_name));
+              std::nullopt,
+              std::nullopt,
+              std::format(
+                "unknown type '{}' in struct '{}' of imported module '{}'",
+                m.second.base_type.base_type(),
+                symbol.name,
+                module_name));
         }
         else
         {
