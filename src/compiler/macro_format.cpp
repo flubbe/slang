@@ -147,6 +147,7 @@ token_stream expand_format_builtin(
        || args[0].data().empty())    // NOLINT(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
     {
         throw macro_error{
+          call_loc,
           "Macro 'format!': No format string provided."};
     }
 
@@ -154,12 +155,14 @@ token_stream expand_format_builtin(
     if(fmt_tok.type != token_type::str_literal)
     {
         throw macro_error{
+          call_loc,
           "Macro 'format!': First argument must be a string literal."};
     }
 
     if(fmt_tok.s.length() < 2)
     {
         throw macro_error{
+          call_loc,
           "Macro 'format!': Malformed format string."};
     }
 
@@ -179,6 +182,7 @@ token_stream expand_format_builtin(
     if(arg_types.size() != placeholders.size())
     {
         throw macro_error{
+          call_loc,
           std::format(
             "Macro 'format!': Argument count ({}) does not match placeholder count ({}).",
             arg_types.size(),
@@ -280,10 +284,10 @@ token_stream expand_format_builtin(
         else
         {
             throw macro_error{
+              call_loc,
               std::format(
-                "Macro 'format!': No formatter for argument {} at {}.",
-                arg_index,
-                ::slang::to_string(call_loc))};
+                "Macro 'format!': No formatter for argument {}.",
+                arg_index)};
         }
 
         append_concat_item(result, conversion, call_loc);

@@ -166,6 +166,15 @@ bool expression::expand_macros(
             auto* descriptor_macro = macro_env.get_macro(
               macro_expr->get_name(),
               std::nullopt);
+            if(descriptor_macro == nullptr)
+            {
+                throw macro::macro_error{
+                  macro_expr->get_location(),
+                  std::format(
+                    "Macro '{}' not found.",
+                    macro_expr->get_name())};
+            }
+
             if(!expand_token_macro(descriptor_macro, macro_expr))
             {
                 throw cg::codegen_error(
@@ -190,6 +199,15 @@ bool expression::expand_macros(
             auto* m = macro_env.get_macro(
               macro_expr->get_name(),
               macro_expr->get_namespace_path());
+            if(m == nullptr)
+            {
+                throw macro::macro_error{
+                  macro_expr->get_location(),
+                  std::format(
+                    "Macro '{}::{}' not found.",
+                    macro_expr->get_namespace_path().value(),
+                    macro_expr->get_name())};
+            }
 
             if(!expand_token_macro(m, macro_expr))
             {

@@ -64,7 +64,7 @@ void format_macro_expression::expand_late_macros(
     }
     catch(const macro::macro_error& e)
     {
-        throw cg::codegen_error(loc, e.what());
+        throw cg::codegen_error(loc, e.message);
     }
 
     expansion = parser::parse_expression(std::move(expansion_tokens));
