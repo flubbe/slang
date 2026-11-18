@@ -12,6 +12,7 @@
 
 #include <string>
 
+#include "compiler/errors.h"
 #include "shared/location.h"
 #include "sema.h"
 
@@ -19,9 +20,9 @@ namespace slang::collect
 {
 
 /** A general collection error. */
-class collection_error : public std::runtime_error
+class collection_error : public source_error
 {
-    using std::runtime_error::runtime_error;
+    using source_error::source_error;
 };
 
 /** Name redefinition error. */

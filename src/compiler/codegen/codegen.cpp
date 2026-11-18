@@ -32,11 +32,7 @@ namespace ld = slang::loader;
 codegen_error::codegen_error(
   const source_location& loc,
   const std::string& message)
-: std::runtime_error{
-    std::format(
-      "{}: {}",
-      to_string(loc),
-      message)}
+: source_error{loc, message}
 {
 }
 

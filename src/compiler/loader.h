@@ -12,6 +12,7 @@
 
 #include <stdexcept>
 
+#include "compiler/errors.h"
 #include "shared/module.h"
 #include "shared/token.h"
 #include "filemanager.h"
@@ -40,9 +41,9 @@ inline std::string make_import_name(
 }
 
 /** A resolve error. */
-class resolve_error : public std::runtime_error
+class resolve_error : public source_error
 {
-    using std::runtime_error::runtime_error;
+    using source_error::source_error;
 
 public:
     /**

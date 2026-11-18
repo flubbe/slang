@@ -4,7 +4,7 @@
  * name resolution.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -29,8 +29,10 @@ namespace slang::loader
  * Exceptions.
  */
 
-resolve_error::resolve_error(const source_location& loc, const std::string& message)
-: std::runtime_error{std::format("{}: {}", to_string(loc), message)}
+resolve_error::resolve_error(
+  const source_location& loc,
+  const std::string& message)
+: source_error{loc, message}
 {
 }
 
@@ -56,12 +58,16 @@ module_::module_resolver& context::resolve_module(
 
     // load the module.
     std::string import_path = import_name;
-    slang::utils::replace_all(import_path, package::delimiter, "/");
+    slang::utils::replace_all(
+      import_path,
+      package::delimiter,
+      "/");
 
     fs::path fs_path = fs::path{import_path};
     if(!fs_path.has_extension())
     {
-        fs_path = fs_path.replace_extension(package::module_ext);
+        fs_path = fs_path.replace_extension(
+          package::module_ext);
     }
     fs::path resolved_path = file_mgr.resolve(fs_path);
 
@@ -90,15 +96,20 @@ const module_::module_resolver& context::get_resolver(
     return *it->second;
 }
 
-std::string context::resolve_name(const std::string& name) const
+std::string context::resolve_name(
+  const std::string& name) const
 {
     std::string import_path = name;
-    slang::utils::replace_all(import_path, package::delimiter, "/");
+    slang::utils::replace_all(
+      import_path,
+      package::delimiter,
+      "/");
 
     fs::path fs_path = fs::path{import_path};
     if(!fs_path.has_extension())
     {
-        fs_path = fs_path.replace_extension(package::module_ext);
+        fs_path = fs_path.replace_extension(
+          package::module_ext);
     }
 
     file_mgr.resolve(fs_path);

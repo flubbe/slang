@@ -243,7 +243,22 @@ public:
       sema::scope_id scope_id,
       std::optional<sema::symbol_type> type = std::nullopt) const
     {
-        return sema_env.get_visible_symbol_names(scope_id, type);
+        auto names = sema_env.get_visible_symbol_names(scope_id, type);
+        if(!type.has_value()
+           || type == sema::symbol_type::type)
+        {
+            auto type_names = type_ctx.get_type_names();
+            names.insert(
+              names.end(),
+              type_names.begin(),
+              type_names.end());
+
+            std::ranges::sort(names);
+            auto [first, last] = std::ranges::unique(names);
+            names.erase(first, last);
+        }
+
+        return names;
     }
 
     /**

@@ -292,10 +292,11 @@ void expression::collect_attributes(sema::env& env) const
               if(!kind.has_value())
               {
                   throw attribs::attribute_error(
+                    expr.get_location(),
                     std::format(
-                      "{}: Unknown attribute '{}'.",
-                      ::slang::to_string(expr.get_location()),
-                      name));
+                      "Unknown attribute '{}'.",
+                      name),
+                    name);
               }
 
               // TODO Formalize attribute specification and allow other argument types.
@@ -2354,11 +2355,10 @@ void type_expression::type_check(
     std::optional<ty::type_id> id = ctx.get_type(get_qualified_name());
     if(!id.has_value())
     {
-        throw ty::type_error{
+        throw ctx.make_type_not_found_error(
           get_location(),
-          std::format(
-            "Type '{}' not found.",
-            get_qualified_name())};
+          get_qualified_name(),
+          type_name.s);
     }
 
     type_id = id.value();
@@ -2522,11 +2522,10 @@ std::optional<ty::type_id> variable_declaration_expression::type_check(
     auto annotated_type_id = ctx.get_type(type->get_qualified_name());
     if(!annotated_type_id.has_value())
     {
-        throw ty::type_error{
+        throw ctx.make_type_not_found_error(
           type->get_location(),
-          std::format(
-            "Type '{}' not found.",
-            type->get_qualified_name())};
+          type->get_qualified_name(),
+          type->get_name());
     }
 
     if(type->is_array())
@@ -2971,11 +2970,10 @@ void struct_definition_expression::define_type(ty::context& ctx) const
           m->get_type()->get_qualified_name());
         if(!field_type.has_value())
         {
-            throw ty::type_error{
+            throw ctx.make_type_not_found_error(
               m->get_type()->get_location(),
-              std::format(
-                "Type '{}' not found.",
-                m->get_type()->get_qualified_name())};
+              m->get_type()->get_qualified_name(),
+              m->get_type()->get_name());
         }
 
         if(m->is_array())
@@ -3124,11 +3122,10 @@ std::optional<ty::type_id> struct_anonymous_initializer_expression::type_check(
       get_qualified_name());    // FIXME should use symbol id?
     if(!struct_type_id.has_value())
     {
-        throw ty::type_error{
+        throw ctx.make_type_not_found_error(
           get_location(),
-          std::format(
-            "Type '{}' not found.",
-            get_qualified_name())};
+          get_qualified_name(),
+          name.s);
     }
 
     const ty::struct_info* si = ctx.get_struct_info(struct_type_id.value());
@@ -3355,11 +3352,10 @@ std::optional<ty::type_id> struct_named_initializer_expression::type_check(
       get_qualified_name());    // FIXME should use symbol id?
     if(!struct_type_id.has_value())
     {
-        throw ty::type_error{
+        throw ctx.make_type_not_found_error(
           get_location(),
-          std::format(
-            "Type '{}' not found.",
-            get_qualified_name())};
+          get_qualified_name(),
+          name.s);
     }
 
     const ty::struct_info* si = ctx.get_struct_info(struct_type_id.value());

@@ -374,6 +374,49 @@ std::optional<type_id> context::get_type(const std::string& name) const
     return std::nullopt;
 }
 
+std::vector<std::string> context::get_type_names() const
+{
+    std::vector<std::string> names;
+    names.reserve(type_info_map.size());
+
+    for(const auto& [id, info]: type_info_map)
+    {
+        if(info.kind == type_kind::builtin)
+        {
+            names.push_back(to_string(id));
+        }
+        else if(info.kind == type_kind::struct_)
+        {
+            const auto& s_info = std::get<struct_info>(info.data);
+            names.push_back(s_info.name);
+            if(s_info.qualified_name.has_value()
+               && s_info.qualified_name.value() != s_info.name)
+            {
+                names.push_back(s_info.qualified_name.value());
+            }
+        }
+    }
+
+    std::ranges::sort(names);
+    auto [first, last] = std::ranges::unique(names);
+    names.erase(first, last);
+
+    return names;
+}
+
+type_error context::make_type_not_found_error(
+  source_location loc,
+  const std::string& name,
+  std::optional<std::string> text) const
+{
+    type_error err{
+      loc,
+      std::format("Type '{}' not found.", name),
+      text.has_value() ? text : name};
+    err.did_you_mean = diag::find_closest_match(name, get_type_names());
+    return err;
+}
+
 std::optional<type_info> context::get_type_info(type_id id) const
 {
     auto it = type_info_map.find(id);

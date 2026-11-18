@@ -813,9 +813,9 @@ void macro_expression::collect_macro(sema::env& sema_env, macro::env& macro_env)
                            }
 
                            throw attribs::attribute_error(
+                             info.loc,
                              std::format(
-                               "{}: Attribute '{}' invalid for macro expressions.",
-                               ::slang::to_string(info.loc),
+                               "Attribute '{}' invalid for macro expressions.",
                                attribs::to_string(info.kind)));
                        })
                      | std::ranges::to<std::vector>();

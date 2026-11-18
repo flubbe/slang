@@ -345,47 +345,10 @@ void compile::invoke(const std::vector<std::string>& args)
     }
     catch(const std::exception& e)
     {
-        // Parse the legacy "<line>:<col>: <message>" encoding out of
-        // what() for errors that do not carry a structured location.
-        // TODO Remove.
-
-        std::string what = e.what();
-        std::size_t first_colon = what.find(':');
-        std::size_t second_colon =
-          (first_colon != std::string::npos)
-            ? what.find(':', first_colon + 1)
-            : std::string::npos;
-
-        if(first_colon != std::string::npos
-           && second_colon != std::string::npos)
-        {
-            try
-            {
-                std::size_t line = std::stoull(what.substr(0, first_colon));
-                std::size_t col = std::stoull(what.substr(first_colon + 1, second_colon - first_colon - 1));
-                std::string msg = what.substr(second_colon + 1);
-
-                if(!msg.empty() && msg.front() == ' ')
-                {
-                    msg.erase(0, 1);
-                }
-
-                diag_ctx.report_error(
-                  module_path.string(),
-                  diag::source_span{slang::source_location{line, col}, 1},
-                  msg);
-            }
-            catch(...)
-            {
-            }
-        }
-        else
-        {
-            diag_ctx.report_error(
-              module_path.string(),
-              std::nullopt,
-              what);
-        }
+        diag_ctx.report_error(
+          module_path.string(),
+          std::nullopt,
+          e.what());
 
         abort_if_errors();
     }

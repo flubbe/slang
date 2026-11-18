@@ -343,6 +343,22 @@ public:
     std::optional<type_id> get_type(
       const std::string& name) const;
 
+    /** Get all known type names (both builtin and structs). */
+    [[nodiscard]] std::vector<std::string> get_type_names() const;
+
+    /**
+     * Create a located `type_error` for an unknown type, computing a
+     * "did you mean" suggestion from known types.
+     *
+     * @param loc Error source location.
+     * @param name The missing type's name.
+     * @param text The offending token text (optional, defaults to name).
+     */
+    [[nodiscard]] type_error make_type_not_found_error(
+      source_location loc,
+      const std::string& name,
+      std::optional<std::string> text = std::nullopt) const;
+
     /**
      * Get the full type info for an existing type.
      *

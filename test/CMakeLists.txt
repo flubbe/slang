@@ -303,11 +303,11 @@ add_jit_compile_test("slang const import" TRUE test/test_const_import)
 
 add_compile_fail_test("slang const type fail" FALSE test/test_const_type_fail)
 
-add_my_test("slang type typo suggest" slang compile test/test_type_typo_fail)
+add_my_test("slang type typo suggest" slang compile test/fail/test_type_typo_fail)
 set_tests_properties("slang type typo suggest"
     PROPERTIES
     WILL_FAIL TRUE
-    PASS_REGULAR_EXPRESSION "did you mean `custom_type`")
+    FAIL_REGULAR_EXPRESSION "did you mean `custom_type`")
 
 add_compile_exec_test("slang conversions" TRUE test/test_conversions)
 add_jit_compile_test("slang conversions" TRUE test/test_conversions)
