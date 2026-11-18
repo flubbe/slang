@@ -25,7 +25,7 @@ namespace slang
 /**
  * An error during lexing, carrying the source location of the offending input.
  */
-class lexical_error : public source_error
+struct lexical_error : public source_error
 {
     using source_error::source_error;
 };

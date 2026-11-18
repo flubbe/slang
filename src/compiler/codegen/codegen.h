@@ -117,20 +117,9 @@ struct name_resolver
 };
 
 /** A code generation error. */
-class codegen_error : public source_error
+struct codegen_error : public source_error
 {
     using source_error::source_error;
-
-public:
-    /**
-     * Construct a `codegen_error`.
-     *
-     * @param loc The error location in the source.
-     * @param message The error message.
-     */
-    codegen_error(
-      const slang::source_location& loc,
-      const std::string& message);
 };
 
 /** An r-value. */

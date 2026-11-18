@@ -40,13 +40,13 @@ using slang::attribs::attribute_info;
 using slang::attribs::attribute_kind;
 
 /** Semantic error. */
-class semantic_error : public source_error
+struct semantic_error : public source_error
 {
     using source_error::source_error;
 };
 
 /** Name resolution error. */
-class name_error : public source_error
+struct name_error : public source_error
 {
     using source_error::source_error;
 };

@@ -24,7 +24,7 @@ namespace slang::macro
 {
 
 /** A generic error during macro processing, carrying the call-site location. */
-class macro_error : public source_error
+struct macro_error : public source_error
 {
     using source_error::source_error;
 };

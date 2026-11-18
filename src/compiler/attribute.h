@@ -4,7 +4,7 @@
  * Attributes.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -24,7 +24,7 @@ namespace slang::attribs
 using slang::source_location;
 
 /** Attribute error. */
-class attribute_error : public source_error
+struct attribute_error : public source_error
 {
     using source_error::source_error;
 };

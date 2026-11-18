@@ -26,17 +26,6 @@ namespace ty = slang::typing;
 namespace ld = slang::loader;
 
 /*
- * Exceptions.
- */
-
-codegen_error::codegen_error(
-  const source_location& loc,
-  const std::string& message)
-: source_error{loc, message}
-{
-}
-
-/*
  * type_kind.
  */
 

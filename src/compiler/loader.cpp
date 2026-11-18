@@ -26,17 +26,6 @@ namespace slang::loader
 {
 
 /*
- * Exceptions.
- */
-
-resolve_error::resolve_error(
-  const source_location& loc,
-  const std::string& message)
-: source_error{loc, message}
-{
-}
-
-/*
  * resolver context.
  */
 

@@ -20,7 +20,7 @@ namespace slang::collect
 {
 
 /** A general collection error. */
-class collection_error : public source_error
+struct collection_error : public source_error
 {
     using source_error::source_error;
 };
