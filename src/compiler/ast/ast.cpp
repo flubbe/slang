@@ -19,6 +19,7 @@
 
 #include "compiler/codegen/codegen.h"
 #include "compiler/attribute.h"
+#include "compiler/errors.h"
 #include "compiler/macro.h"
 #include "compiler/typing.h"
 #include "shared/module.h"
@@ -232,7 +233,7 @@ std::unique_ptr<cg::rvalue> expression::try_emit_const_eval_result(
 
         std::println(
           "{}: Warning: Attempted constant expression computation failed.",
-          ::slang::to_string(loc));
+          slang::to_string(loc));
     }
 
     return {};
@@ -256,18 +257,20 @@ void expression::generate_code(
 std::unique_ptr<cg::lvalue> expression::emit_lvalue(
   [[maybe_unused]] cg::context& ctx) const
 {
-    throw cg::codegen_error(
-      loc,
-      "Expression cannot be used as an l-value.");
+    throw internal_error(
+      std::format(
+        "{}: Expression cannot be used as an l-value.",
+        slang::to_string(loc)));
 }
 
 std::unique_ptr<cg::rvalue> expression::emit_rvalue(
   [[maybe_unused]] cg::context& ctx,
   [[maybe_unused]] bool result_used) const
 {
-    throw cg::codegen_error(
-      loc,
-      "Expression cannot be used as an r-value.");
+    throw internal_error(
+      std::format(
+        "{}: Expression cannot be used as an r-value.",
+        slang::to_string(loc)));
 }
 
 void expression::collect_attributes(sema::env& env) const
@@ -405,7 +408,7 @@ void expression::bind_constant_declarations(
               throw std::runtime_error{
                 std::format(
                   "{}: Constant has no symbol id.",
-                  ::slang::to_string(expr.get_location()))};
+                  slang::to_string(expr.get_location()))};
           }
 
           const_env.register_constant(symbol_id.value());
@@ -451,7 +454,7 @@ void expression::evaluate_constant_expressions(
                       throw std::runtime_error{
                         std::format(
                           "{}: Symbol id already contained in constant map.",
-                          ::slang::to_string(expr.get_location()))};
+                          slang::to_string(expr.get_location()))};
                   }
 
                   const auto* const_expr = const_decl->get_expr();
@@ -460,7 +463,7 @@ void expression::evaluate_constant_expressions(
                       throw std::runtime_error{
                         std::format(
                           "{}: Constant expression has invalid handle.",
-                          ::slang::to_string(expr.get_location()))};
+                          slang::to_string(expr.get_location()))};
                   }
 
                   auto const_value = env.get_expression_value(*const_expr);
@@ -646,12 +649,18 @@ std::unique_ptr<cg::rvalue> literal_expression::emit_rvalue(
 {
     if(!tok.value.has_value())
     {
-        throw cg::codegen_error(loc, "Empty literal.");
+        throw internal_error{
+          std::format(
+            "{}: Empty literal.",
+            slang::to_string(loc))};
     }
 
     if(!expr_type.has_value())
     {
-        throw cg::codegen_error(loc, "Literal expression has no type.");
+        throw internal_error{
+          std::format(
+            "{}: Literal expression has no type.",
+            slang::to_string(loc))};
     }
 
     auto lowered_type = ctx.lower(expr_type.value());
@@ -702,12 +711,12 @@ std::unique_ptr<cg::rvalue> literal_expression::emit_rvalue(
                 std::get<std::string>(tok.value.value())));
         }
 
-        throw cg::codegen_error(
-          loc,
+        throw internal_error{
           std::format(
-            "Unable to generate code for literal of unknown type kind '{}' (type id {}) during code generation.",
+            "{}: Unable to generate code for literal of unexpected type kind '{}' (type id {}) during code generation.",
+            slang::to_string(loc),
             cg::to_string(lowered_type.get_type_kind()),
-            lowered_type.get_type_id().value_or(-1)));
+            lowered_type.get_type_id().value_or(-1))};
     }();
 
     auto literal_type = cg::type{
@@ -959,9 +968,20 @@ std::unique_ptr<cg::rvalue> type_cast_expression::emit_rvalue(
   [[maybe_unused]] bool result_used) const
 {
     auto v = expr->emit_rvalue(ctx, true);
+    cg::type lowered_type = ctx.lower(target_type->get_type());
+
+    const auto throw_invalid_cast = [this, &v, &lowered_type]() -> void
+    {
+        throw internal_error{
+          std::format(
+            "{}: Invalid cast from {} to {}.",
+            slang::to_string(loc),
+            v->get_type().to_string(),
+            lowered_type.to_string())};
+    };
 
     // only cast if necessary.
-    cg::type lowered_type = ctx.lower(target_type->get_type());
+    // TODO Check the always_cast logic for types that might need narrowing (i8, i16)
     if(always_cast
        || lowered_type.get_type_kind() != v->get_type().get_type_kind())
     {
@@ -979,12 +999,7 @@ std::unique_ptr<cg::rvalue> type_cast_expression::emit_rvalue(
                 }
                 else
                 {
-                    throw cg::codegen_error(
-                      loc,
-                      std::format(
-                        "Invalid cast from {} to {}.",
-                        v->get_type().to_string(),
-                        lowered_type.to_string()));
+                    throw_invalid_cast();
                 }
             }
             else if(lowered_type.get_type_kind() == cg::type_kind::i16)
@@ -996,12 +1011,7 @@ std::unique_ptr<cg::rvalue> type_cast_expression::emit_rvalue(
                 }
                 else
                 {
-                    throw cg::codegen_error(
-                      loc,
-                      std::format(
-                        "Invalid cast from {} to {}.",
-                        v->get_type().to_string(),
-                        lowered_type.to_string()));
+                    throw_invalid_cast();
                 }
             }
             else if(lowered_type.get_type_kind() == cg::type_kind::i32)
@@ -1022,12 +1032,7 @@ std::unique_ptr<cg::rvalue> type_cast_expression::emit_rvalue(
             }
             else
             {
-                throw cg::codegen_error(
-                  loc,
-                  std::format(
-                    "Invalid cast from {} to {}.",
-                    v->get_type().to_string(),
-                    lowered_type.to_string()));
+                throw_invalid_cast();
             }
         }
         else if(v->get_type().get_type_kind() == cg::type_kind::i32)
@@ -1054,11 +1059,7 @@ std::unique_ptr<cg::rvalue> type_cast_expression::emit_rvalue(
             }
             else
             {
-                throw cg::codegen_error(
-                  loc,
-                  std::format(
-                    "Invalid cast from i32 to {}.",
-                    lowered_type.to_string()));
+                throw_invalid_cast();
             }
         }
         else if(v->get_type().get_type_kind() == cg::type_kind::i64)
@@ -1087,11 +1088,7 @@ std::unique_ptr<cg::rvalue> type_cast_expression::emit_rvalue(
             }
             else
             {
-                throw cg::codegen_error(
-                  loc,
-                  std::format(
-                    "Invalid cast from i32 to {}.",
-                    lowered_type.to_string()));
+                throw_invalid_cast();
             }
         }
         else if(v->get_type().get_type_kind() == cg::type_kind::f32)
@@ -1120,11 +1117,7 @@ std::unique_ptr<cg::rvalue> type_cast_expression::emit_rvalue(
             }
             else
             {
-                throw cg::codegen_error(
-                  loc,
-                  std::format(
-                    "Invalid cast from f32 to {}.",
-                    lowered_type.to_string()));
+                throw_invalid_cast();
             }
         }
         else if(v->get_type().get_type_kind() == cg::type_kind::f64)
@@ -1153,21 +1146,13 @@ std::unique_ptr<cg::rvalue> type_cast_expression::emit_rvalue(
             }
             else
             {
-                throw cg::codegen_error(
-                  loc,
-                  std::format(
-                    "Invalid cast from f32 to {}.",
-                    lowered_type.to_string()));
+                throw_invalid_cast();
             }
         }
         else if(lowered_type.get_type_kind() == cg::type_kind::str
                 && v->get_type().get_type_kind() != cg::type_kind::ref)
         {
-            throw cg::codegen_error(
-              loc,
-              std::format(
-                "Cannot cast '{}' to 'str'.",
-                v->get_type().to_string()));
+            throw_invalid_cast();
         }
         else
         {
@@ -1425,15 +1410,24 @@ std::unique_ptr<cg::lvalue> access_expression::emit_lvalue(
     // validate expression.
     if(!expr_type.has_value())
     {
-        throw cg::codegen_error(loc, "Access expression has no type.");
+        throw internal_error{
+          std::format(
+            "{}: Access expression has no type.",
+            slang::to_string(loc))};
     }
     if(!rhs)
     {
-        throw cg::codegen_error(loc, "Access expression has no r.h.s.");
+        throw internal_error{
+          std::format(
+            "{}: Access expression has no r.h.s.",
+            slang::to_string(loc))};
     }
     if(!struct_type.has_value())
     {
-        throw cg::codegen_error(loc, "Access expression has no struct type.");
+        throw internal_error{
+          std::format(
+            "{}: Access expression has no struct type.",
+            slang::to_string(loc))};
     }
 
     // load l.h.s. for access.
@@ -1449,23 +1443,28 @@ std::unique_ptr<cg::lvalue> access_expression::emit_lvalue(
 
         if(!rhs->is_named_expression())
         {
-            throw cg::codegen_error(
-              loc,
+            throw internal_error{
               std::format(
-                "Could not find name for element access in array access expression."));
+                "{}: Could not find name for element access in array access expression.",
+                slang::to_string(loc))};
         }
         auto* identifier_expr = rhs->as_named_expression();
 
+        // TODO This should be caught be semantic analysis.
         if(identifier_expr->get_name() == "length")
         {
-            throw cg::codegen_error(rhs->get_location(), "Array length is read only.");
+            throw internal_error{
+              std::format(
+                "{}: Array length is read only.",
+                slang::to_string(rhs->get_location()))};
         }
 
-        throw cg::codegen_error(
-          rhs->get_location(),
+        // TODO This should be caught be semantic analysis.
+        throw internal_error{
           std::format(
-            "Unknown array property '{}'.",
-            identifier_expr->get_name()));
+            "{}: Unknown array property '{}'.",
+            slang::to_string(rhs->get_location()),
+            identifier_expr->get_name())};
     }
 
     /*
@@ -1604,7 +1603,7 @@ std::optional<ty::type_id> access_expression::type_check(
         throw std::runtime_error{
           std::format(
             "{}: Expected <identifier> as accessor (got node id {}).",
-            ::slang::to_string(loc),
+            slang::to_string(loc),
             std::to_underlying(rhs->get_id()))};
     }
 
@@ -1907,7 +1906,7 @@ expression* directive_expression::get_target()
         throw std::runtime_error{
           std::format(
             "{}: Directive without target",
-            ::slang::to_string(get_location()))};
+            slang::to_string(get_location()))};
     }
 
     return it;
@@ -1928,7 +1927,7 @@ const expression* directive_expression::get_target() const
         throw std::runtime_error{
           std::format(
             "{}: Directive without target",
-            ::slang::to_string(get_location()))};
+            slang::to_string(get_location()))};
     }
 
     return it;
@@ -5305,7 +5304,7 @@ void block::generate_code(
     {
         if(expr->is_pure(ctx))
         {
-            std::println("{}: Expression has no effect.", ::slang::to_string(expr->get_location()));
+            std::println("{}: Expression has no effect.", slang::to_string(expr->get_location()));
 
             // don't generate code.
             continue;
@@ -5340,7 +5339,7 @@ std::unique_ptr<cg::rvalue> block::emit_rvalue(
         {
             std::println(
               "{}: Expression has no effect.",
-              ::slang::to_string(expr->get_location()));
+              slang::to_string(expr->get_location()));
             continue;
         }
 

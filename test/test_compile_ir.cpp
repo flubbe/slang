@@ -3131,7 +3131,7 @@ TEST(compile_ir, compound_assignments)
         ASSERT_NO_THROW(ast->define_types(type_ctx));
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
-        EXPECT_THROW(ast->generate_code(ctx), cg::codegen_error);
+        EXPECT_THROW(ast->generate_code(ctx), slang::internal_error);
     }
 }
 
