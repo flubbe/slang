@@ -187,6 +187,12 @@ set_tests_properties(interpreter PROPERTIES FIXTURES_REQUIRED output)
 
 add_gtest_executable(test_vector test_vector.cpp)
 
+add_gtest_executable(test_builtins
+    macros/test_builtins.cpp
+    ../src/compiler/format_util.cpp
+    ../src/shared/location.cpp
+)
+
 if(APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
     add_gtest_executable(test_jit_apple_aarch64
         ../src/archives/file.cpp

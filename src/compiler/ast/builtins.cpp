@@ -32,16 +32,17 @@ void format_macro_expression::expand_late_macros(
 {
     if(expansion)
     {
-        throw cg::codegen_error(
-          loc,
-          "Double 'format!' macro expansion.");
+        throw internal_error{
+          "Double 'format!' macro expansion."};
     }
 
     std::vector<ty::type_id> arg_types;
     arg_types.reserve(exprs.size() > 1 ? exprs.size() - 1 : 0);
     for(std::size_t i = 1; i < exprs.size(); ++i)
     {
-        std::optional<ty::type_id> arg_type = exprs[i]->type_check(ctx, env);
+        auto arg_type = exprs[i]->type_check(ctx, env);
+
+        // TODO likely needs different error handling (e.g., just return?)
         if(!arg_type.has_value())
         {
             throw cg::codegen_error(
@@ -53,21 +54,14 @@ void format_macro_expression::expand_late_macros(
         arg_types.push_back(arg_type.value());
     }
 
-    token_stream expansion_tokens;
-    try
-    {
-        expansion_tokens = macro::expand_format_builtin(
-          arg_tokens,
-          arg_types,
-          loc,
-          ctx);
-    }
-    catch(const macro::macro_error& e)
-    {
-        throw cg::codegen_error(loc, e.message);
-    }
+    auto expansion_tokens = macro::expand_format_builtin(    // NOTE Might throw macro_error.
+      arg_tokens,
+      arg_types,
+      loc,
+      ctx);
 
-    expansion = parser::parse_expression(std::move(expansion_tokens));
+    expansion = parser::parse_expression(
+      std::move(expansion_tokens));
 }
 
 std::unique_ptr<cg::rvalue> format_macro_expression::emit_rvalue(
@@ -76,15 +70,15 @@ std::unique_ptr<cg::rvalue> format_macro_expression::emit_rvalue(
 {
     if(!expansion)
     {
-        throw cg::codegen_error(
-          loc,
-          "Empty 'format!' macro expansion.");
+        throw internal_error{
+          "Attempted to emit an unexpanded 'format!' macro."};
     }
 
     return expansion->emit_rvalue(ctx, result_used);
 }
 
-void format_macro_expression::collect_names(co::context& ctx)
+void format_macro_expression::collect_names(
+  co::context& ctx)
 {
     if(!expansion)
     {
@@ -98,7 +92,8 @@ void format_macro_expression::collect_names(co::context& ctx)
     }
 }
 
-void format_macro_expression::resolve_names(rs::context& ctx)
+void format_macro_expression::resolve_names(
+  rs::context& ctx)
 {
     if(expansion)
     {
@@ -106,7 +101,9 @@ void format_macro_expression::resolve_names(rs::context& ctx)
     }
 }
 
-std::optional<ty::type_id> format_macro_expression::type_check(ty::context& ctx, sema::env& env)
+std::optional<ty::type_id> format_macro_expression::type_check(
+  ty::context& ctx,
+  sema::env& env)
 {
     if(expansion)
     {
@@ -138,30 +135,20 @@ std::optional<ty::type_id> format_macro_expression::type_check(ty::context& ctx,
 
     if(exprs[0]->type_check(ctx, env) != ctx.get_str_type())
     {
-        throw ty::type_error(
-          exprs[0]->get_location(),
-          "Expected <string-literal>.");
+        throw internal_error{
+          "String literal has unexpected type."};
     }
 
     if(format_token.s.length() < 2)
     {
-        throw ty::type_error(
-          format_token.location,
-          "Macro 'format!': Malformed format string.");
+        throw internal_error{
+          "Macro 'format!': Malformed format string."};
     }
 
     std::string fmt = format_token.s.substr(1, format_token.s.length() - 2);
-
-    std::vector<format_util::placeholder> placeholders;
-    try
-    {
-        placeholders = format_util::parse_format_string(fmt, format_token.location);
-    }
-    catch(const std::exception& e)
-    {
-        throw ty::type_error(loc, e.what());
-    }
-
+    std::vector<format_util::placeholder> placeholders = format_util::parse_format_string(
+      fmt,
+      loc.advance(1));
     if(placeholders.size() != exprs.size() - 1)
     {
         throw ty::type_error(
@@ -180,6 +167,7 @@ std::optional<ty::type_id> format_macro_expression::type_check(ty::context& ctx,
         std::optional<ty::type_id> t = e->type_check(ctx, env);
         if(!t.has_value())
         {
+            // TODO likely needs different error handling (e.g., just return?)
             throw ty::type_error(
               e->get_location(),
               std::format(
@@ -187,18 +175,11 @@ std::optional<ty::type_id> format_macro_expression::type_check(ty::context& ctx,
                 i));
         }
 
-        try
-        {
-            format_util::validate_arg_type(
-              t.value(),
-              p.specifier,
-              ctx,
-              e->get_location());
-        }
-        catch(const std::exception& err)
-        {
-            throw ty::type_error(e->get_location(), err.what());
-        }
+        format_util::validate_arg_type(
+          t.value(),
+          p.specifier,
+          ctx,
+          e->get_location());
     }
 
     return ctx.get_str_type();
