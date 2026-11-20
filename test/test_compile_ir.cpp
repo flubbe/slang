@@ -82,10 +82,10 @@ public:
         auto it = sema_env.symbol_table.find(id);
         if(it == sema_env.symbol_table.end())
         {
-            throw std::runtime_error(
+            throw std::runtime_error{
               std::format(
                 "Symbol with id {} not found in symbol table.",
-                id.value));
+                id.value)};
         }
 
         if(it->second.declaring_module == sema::symbol_info::current_module_id)
@@ -108,7 +108,12 @@ public:
       std::size_t field_index) const override
     {
         auto info = type_ctx.get_struct_info(type_id);
-        return info.fields.at(field_index).name;
+        if(info == nullptr)
+        {
+            throw std::runtime_error{"Struct info not found."};
+        }
+
+        return info->fields.at(field_index).name;
     }
 
     [[nodiscard]]
@@ -118,10 +123,10 @@ public:
         auto it = const_env.const_literal_map.find(id);
         if(it == const_env.const_literal_map.end())
         {
-            throw std::runtime_error(
+            throw std::runtime_error{
               std::format(
                 "Constant with id {} not found in constant literal table.",
-                id));
+                id)};
         }
 
         switch(it->second.type)
@@ -150,11 +155,11 @@ public:
             // fall-through.
         }
 
-        throw std::runtime_error(
+        throw std::runtime_error{
           std::format(
             "Constant with id {} has unknown type '{}'.",
             id,
-            std::to_underlying(it->second.type)));
+            std::to_underlying(it->second.type))};
     }
 };
 
@@ -3126,7 +3131,7 @@ TEST(compile_ir, compound_assignments)
         ASSERT_NO_THROW(ast->define_types(type_ctx));
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
-        EXPECT_THROW(ast->generate_code(ctx), cg::codegen_error);
+        EXPECT_THROW(ast->generate_code(ctx), slang::internal_error);
     }
 }
 

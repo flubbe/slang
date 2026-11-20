@@ -12,9 +12,11 @@
 
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "shared/token.h"
+#include "errors.h"
 #include "type.h"
 
 namespace slang::typing
@@ -24,6 +26,12 @@ class context;
 
 namespace slang::format_util
 {
+
+/** A formatting error. */
+struct format_error : public source_error
+{
+    using source_error::source_error;
+};
 
 /** A format string placeholder with its resolved type. */
 struct placeholder
@@ -53,7 +61,7 @@ struct placeholder
  * @throws std::runtime_error on invalid format string.
  */
 std::vector<placeholder> parse_format_string(
-  const std::string& fmt,
+  std::string_view fmt,
   source_location loc);
 
 /**

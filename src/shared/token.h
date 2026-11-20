@@ -10,7 +10,7 @@
 
 #pragma once
 
-#include <cstddef>
+#include <format>
 #include <optional>
 #include <variant>
 #include <vector>
@@ -32,9 +32,9 @@ enum class token_type
     int_literal,      /** integer literal */
     fp_literal,       /** floating-point literal */
     str_literal,      /** a quoted string (including the quotes) */
-    end_of_input,     /** parser-owned end-of-input marker */
+    eof,              /** parser-owned end-of-input marker */
 
-    last = end_of_input /** Last element. */
+    last = eof /** Last element. */
 };
 
 /**
@@ -180,6 +180,36 @@ struct token
     , trailing_comments{std::move(trailing_comments)}
     , context{context}
     {
+    }
+
+    /**
+     * Describe the token. Returns `'<token>'` for regular tokens,
+     * and `end of file` for EOF tokens.
+     */
+    std::string describe() const
+    {
+        if(type == token_type::eof)
+        {
+            return "end of file";
+        }
+
+        return std::format("'{}'", s);
+    }
+
+    /**
+     * Create an EOF token.
+     *
+     * @param source_location Location of the end of file / end of input.
+     * @returns Returns the token.
+     */
+    static token eof(
+      source_location location)
+    {
+        // We leave the lexeme empty (diagnostics use this for underlining).
+        return {
+          {},
+          location,
+          token_type::eof};
     }
 };
 

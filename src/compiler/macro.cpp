@@ -223,6 +223,7 @@ token_stream macro::expand_macro(
              }))
         {
             throw macro_error{
+              call_loc,
               std::format(
                 "Macro '{}' argument contains an unresolved macro placeholder.",
                 name)};
@@ -235,6 +236,7 @@ token_stream macro::expand_macro(
     if(rule == nullptr)
     {
         throw macro_error{
+          call_loc,
           std::format(
             "Could not match a rule of macro '{}'.",
             name)};
@@ -242,6 +244,7 @@ token_stream macro::expand_macro(
     if(selection.ambiguous)
     {
         throw macro_error{
+          call_loc,
           std::format(
             "Macro '{}' has ambiguous rules.",
             name)};
@@ -298,6 +301,7 @@ token_stream macro::expand_macro(
                         else
                         {
                             throw macro_error{
+                              call_loc,
                               std::format(
                                 "Macro '{}' is missing argument for '{}'.",
                                 name,
@@ -346,6 +350,7 @@ token_stream macro::expand_macro(
             if(tok.s != name)
             {
                 throw macro_error{
+                  call_loc,
                   std::format(
                     "Macro '{}' references unknown parameter '{}'.",
                     name,
@@ -427,19 +432,7 @@ macro* env::get_macro(
         return it->get();
     }
 
-    // macro was not found.
-    if(import_path.has_value())
-    {
-        throw macro_error(
-          std::format(
-            "Macro '{}::{}' not found.",
-            import_path.value(),
-            name));
-    }
-    throw macro_error(
-      std::format(
-        "Macro '{}' not found.",
-        name));
+    return nullptr;
 }
 
 }    // namespace slang::macro

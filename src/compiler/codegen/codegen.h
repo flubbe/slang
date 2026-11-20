@@ -25,6 +25,7 @@
 #include "archives/memory.h"
 #include "compiler/constant.h"
 #include "compiler/directive.h"
+#include "compiler/errors.h"
 #include "compiler/lowering.h"
 #include "compiler/name_utils.h"
 #include "compiler/sema.h"
@@ -116,20 +117,9 @@ struct name_resolver
 };
 
 /** A code generation error. */
-class codegen_error : public std::runtime_error
+struct codegen_error : public source_error
 {
-    using std::runtime_error::runtime_error;
-
-public:
-    /**
-     * Construct a `codegen_error`.
-     *
-     * @param loc The error location in the source.
-     * @param message The error message.
-     */
-    codegen_error(
-      const slang::source_location& loc,
-      const std::string& message);
+    using source_error::source_error;
 };
 
 /** An r-value. */

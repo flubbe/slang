@@ -4,7 +4,7 @@
  * instruction emitter.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -13,6 +13,7 @@
 #include <set>
 
 #include "archives/memory.h"
+#include "errors.h"
 #include "shared/module.h"
 
 /*
@@ -59,10 +60,10 @@ namespace cg = slang::codegen;
 namespace tl = slang::lowering;
 namespace ty = slang::typing;
 
-/** An error during instruction emission. */
-class emitter_error : public std::runtime_error
+/** An error during instruction emission (a back-end invariant violation). */
+class emitter_error : public internal_error
 {
-    using std::runtime_error::runtime_error;
+    using internal_error::internal_error;
 };
 
 /** Import table builder. */

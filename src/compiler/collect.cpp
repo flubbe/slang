@@ -41,11 +41,13 @@ redefinition_error::redefinition_error(
   const std::string& symbol_name,
   source_location loc,    // NOLINT(bugprone-easily-swappable-parameters)
   source_location original_loc)
-: collection_error{std::format(
-    "{}: Redeclaration of '{}' (was already defined at {})",
-    to_string(loc),
-    symbol_name,
-    to_string(original_loc))}
+: collection_error{
+    loc,
+    std::format(
+      "Redeclaration of '{}' (was already defined at {})",
+      symbol_name,
+      to_string(original_loc)),
+    symbol_name}
 , symbol_name{symbol_name}
 , loc{loc}
 , original_loc{original_loc}
@@ -83,7 +85,7 @@ sema::scope_id context::create_scope(
          .bindings = {}}});
     if(!success)
     {
-        throw collection_error(
+        throw collection_error(    // TODO internal error, or redefinition error?
           std::format(
             "Scope with id '{}' already exists to scope table.",
             new_scope_id));
@@ -281,17 +283,16 @@ void context::push_scope(sema::scope_id id)
 {
     if(id == sema::scope::invalid_id)
     {
-        throw collection_error(
-          std::format(
-            "Cannot enter invalid scope."));
+        throw internal_error{
+          "Cannot enter invalid scope."};
     }
 
     if(!has_scope(env, id))
     {
-        throw collection_error(
+        throw internal_error{
           std::format(
             "Cannot enter unknown scope '{}'.",
-            id));
+            id)};
     }
 
     current_scope = id;

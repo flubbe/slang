@@ -4,7 +4,7 @@
  * instruction emitter.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -78,10 +78,10 @@ std::size_t import_table_builder::get_package(
       });
     if(it == import_table.end())
     {
-        throw emitter_error(
+        throw emitter_error{
           std::format(
             "Package '{}' could not be found in import table.",
-            qualified_name));
+            qualified_name)};
     }
 
     return std::distance(import_table.begin(), it);
@@ -106,18 +106,18 @@ std::size_t import_table_builder::intern_function(
 
     if(package_index >= import_table.size())
     {
-        throw emitter_error(
+        throw emitter_error{
           std::format(
             "Package index {} out of bounds.",
-            package_index));
+            package_index)};
     }
 
     if(import_table[package_index].type != module_::symbol_type::package)
     {
-        throw emitter_error(
+        throw emitter_error{
           std::format(
             "Import index {} is not a package.",
-            package_index));
+            package_index)};
     }
 
     import_table.emplace_back(
@@ -141,11 +141,11 @@ std::size_t import_table_builder::get_function(
       });
     if(it == import_table.end())
     {
-        throw emitter_error(
+        throw emitter_error{
           std::format(
             "Function '{}' with package index '{}' could not be found in import table.",
             name,
-            package_index));
+            package_index)};
     }
 
     return std::distance(import_table.begin(), it);
@@ -195,11 +195,11 @@ std::size_t import_table_builder::get_struct(
       });
     if(it == import_table.end())
     {
-        throw emitter_error(
+        throw emitter_error{
           std::format(
             "Struct '{}' with package index '{}' could not be found in import table.",
             name,
-            package_index));
+            package_index)};
     }
 
     return std::distance(import_table.begin(), it);
@@ -232,7 +232,10 @@ void export_table_builder::add_function(
                   && entry.name == name; })
        != export_table.end())
     {
-        throw emitter_error(std::format("Cannot add function to export table: '{}' already exists.", name));
+        throw emitter_error{
+          std::format(
+            "Cannot add function to export table: '{}' already exists.",
+            name)};
     }
 
     export_table.emplace_back(
@@ -260,7 +263,10 @@ void export_table_builder::update_function(
                && entry.name == name; });
     if(it == export_table.end())
     {
-        throw emitter_error(std::format("Cannot update function to export table: '{}' not found.", name));
+        throw emitter_error{
+          std::format(
+            "Cannot update function to export table: '{}' not found.",
+            name)};
     }
 
     auto& desc = std::get<module_::function_descriptor>(it->desc);
@@ -284,7 +290,10 @@ void export_table_builder::add_native_function(
                   && entry.name == name; })
        != export_table.end())
     {
-        throw emitter_error(std::format("Cannot add function to export table: '{}' already exists.", name));
+        throw emitter_error{
+          std::format(
+            "Cannot add function to export table: '{}' already exists.",
+            name)};
     }
 
     export_table.emplace_back(
@@ -323,10 +332,10 @@ static std::optional<import_info> get_import_info(
     const auto symbol_info_it = sema_env.symbol_table.find(symbol_id);
     if(symbol_info_it == sema_env.symbol_table.end())
     {
-        throw emitter_error(
+        throw emitter_error{
           std::format(
             "Could not find symbol info for symbol with id {}.",
-            symbol_id.value));
+            symbol_id.value)};
     }
 
     if(symbol_info_it->second.declaring_module == sema::symbol_info::current_module_id)
@@ -337,11 +346,11 @@ static std::optional<import_info> get_import_info(
     auto declaring_module_symbol_it = sema_env.symbol_table.find(symbol_info_it->second.declaring_module);
     if(declaring_module_symbol_it == sema_env.symbol_table.end())
     {
-        throw emitter_error(
+        throw emitter_error{
           std::format(
             "Could not find symbol for module with id {} for symbol '{}'.",
             symbol_info_it->second.declaring_module.value,
-            symbol_info_it->second.qualified_name));
+            symbol_info_it->second.qualified_name)};
     }
 
     return std::make_optional<import_info>(
@@ -360,10 +369,10 @@ void export_table_builder::add_struct(
                   && entry.name == type.name; })
        != export_table.end())
     {
-        throw emitter_error(
+        throw emitter_error{
           std::format(
             "Cannot add type to export table: '{}' already exists.",
-            type.name));
+            type.name)};
     }
 
     std::vector<std::pair<std::string, module_::field_descriptor>> transformed_members =
@@ -372,8 +381,12 @@ void export_table_builder::add_struct(
         [&emitter](
           const ty::field_info& info) -> std::pair<std::string, module_::field_descriptor>
         {
-            const ty::type_info& base_type_info = emitter.type_ctx.get_type_info(
-              emitter.type_ctx.get_base_type(info.type));
+            auto base_type_id = ty::throw_or(
+              emitter.type_ctx.get_base_type(info.type),
+              std::format("Could not get base type of type id '{}'.", info.type));
+            const ty::type_info& base_type_info = ty::throw_or(
+              emitter.type_ctx.get_type_info(base_type_id),
+              std::format("Type with id '{}' not found.", base_type_id));
             std::string base_type;
             std::optional<std::size_t> field_type_import_index{std::nullopt};
 
@@ -404,10 +417,10 @@ void export_table_builder::add_struct(
                   });
                 if(it == emitter.sema_env.symbol_table.end())
                 {
-                    throw emitter_error(
+                    throw emitter_error{
                       std::format(
                         "Struct '{}' not found in symbol table.",
-                        field_type_info_data.name));
+                        field_type_info_data.name)};
                 }
 
                 base_type = name::unqualified_name(it->second.name);
@@ -428,10 +441,10 @@ void export_table_builder::add_struct(
             }
             else
             {
-                throw emitter_error(
+                throw emitter_error{
                   std::format(
                     "Invalid base type kind '{}'.",
-                    std::to_underlying(base_type_info.kind)));
+                    std::to_underlying(base_type_info.kind))};
             }
 
             return std::make_pair(
@@ -464,7 +477,10 @@ void export_table_builder::add_constant(std::string name, std::size_t i)
                   && entry.name == name; })
        != export_table.end())
     {
-        throw emitter_error(std::format("Cannot add constant to export table: '{}' already exists.", name));
+        throw emitter_error{
+          std::format(
+            "Cannot add constant to export table: '{}' already exists.",
+            name)};
     }
 
     export_table.emplace_back(module_::symbol_type::constant, std::move(name), i);
@@ -479,7 +495,10 @@ void export_table_builder::add_macro(std::string name, module_::macro_descriptor
                   && entry.name == name; })
        != export_table.end())
     {
-        throw emitter_error(std::format("Cannot add macro to export table: '{}' already exists.", name));
+        throw emitter_error{
+          std::format(
+            "Cannot add macro to export table: '{}' already exists.",
+            name)};
     }
 
     export_table.emplace_back(
@@ -499,11 +518,11 @@ std::size_t export_table_builder::get_index(
                && entry.name == name; });
     if(it == export_table.cend())
     {
-        throw emitter_error(
+        throw emitter_error{
           std::format(
             "Symbol '{}' of type '{}' not found in export table.",
             name,
-            to_string(t)));
+            to_string(t))};
     }
 
     return std::distance(export_table.cbegin(), it);
@@ -555,7 +574,10 @@ void export_table_builder::write(module_::language_module& mod) const
         }
         else
         {
-            throw emitter_error(std::format("Unexpected symbol type '{}' during export table write.", to_string(entry.type)));
+            throw emitter_error{
+              std::format(
+                "Unexpected symbol type '{}' during export table write.",
+                to_string(entry.type))};
         }
     }
 }
@@ -636,8 +658,19 @@ void instruction_emitter::collect_imports()
             continue;
         }
 
-        const auto& type_info = type_ctx.get_type_info(
-          type_ctx.get_type(symbol_info.name));
+        std::optional<ty::type_id> type_id = type_ctx.get_type(symbol_info.name);
+        if(!type_id.has_value())
+        {
+            throw emitter_error{
+              symbol_info.loc,
+              std::format(
+                "Type '{}' not found.",
+                symbol_info.name)};
+        }
+
+        const auto& type_info = ty::throw_or(
+          type_ctx.get_type_info(type_id.value()),
+          std::format("Type with id '{}' not found.", type_id.value()));
 
         imports.intern_struct(
           symbol_info.qualified_name);
@@ -645,7 +678,9 @@ void instruction_emitter::collect_imports()
         const auto& struct_info = std::get<ty::struct_info>(type_info.data);
         for(const auto& field_info: struct_info.fields)
         {
-            const auto& field_type_info = type_ctx.get_type_info(field_info.type);
+            const auto& field_type_info = ty::throw_or(
+              type_ctx.get_type_info(field_info.type),
+              std::format("Type with id '{}' not found.", field_info.type));
             if(field_type_info.kind != ty::type_kind::struct_)
             {
                 continue;
@@ -678,13 +713,15 @@ void instruction_emitter::collect_imports()
             std::optional<ty::type_id> id = arg.second.get_type_id();
             if(!id.has_value())
             {
-                throw emitter_error(
+                throw emitter_error{
                   std::format(
                     "'{}': Argument has no type id.",
-                    f->get_name()));
+                    f->get_name())};
             }
 
-            ty::type_info info = type_ctx.get_type_info(id.value());
+            ty::type_info info = ty::throw_or(
+              type_ctx.get_type_info(id.value()),
+              std::format("Type with id '{}' not found.", id.value()));
             if(info.kind == ty::type_kind::struct_)
             {
                 const auto& struct_info = std::get<ty::struct_info>(info.data);
@@ -700,13 +737,15 @@ void instruction_emitter::collect_imports()
             std::optional<ty::type_id> id = local.second.get_type_id();
             if(!id.has_value())
             {
-                throw emitter_error(
+                throw emitter_error{
                   std::format(
                     "'{}': Local has no type id.",
-                    f->get_name()));
+                    f->get_name())};
             }
 
-            ty::type_info info = type_ctx.get_type_info(id.value());
+            ty::type_info info = ty::throw_or(
+              type_ctx.get_type_info(id.value()),
+              std::format("Type with id '{}' not found.", id.value()));
             if(info.kind == ty::type_kind::struct_)
             {
                 const auto& struct_info = std::get<ty::struct_info>(info.data);
@@ -721,13 +760,17 @@ void instruction_emitter::collect_imports()
         std::optional<ty::type_id> return_type_id = sig.first.get_type_id();
         if(!return_type_id.has_value())
         {
-            throw emitter_error(
+            throw emitter_error{
               std::format(
                 "'{}': Return type has no type id.",
-                f->get_name()));
+                f->get_name())};
         }
 
-        ty::type_info return_type_info = type_ctx.get_type_info(return_type_id.value());
+        ty::type_info return_type_info = ty::throw_or(
+          type_ctx.get_type_info(return_type_id.value()),
+          std::format(
+            "Type with id '{}' not found.",
+            return_type_id.value()));
         if(return_type_info.kind == ty::type_kind::struct_)
         {
             const auto& struct_info = std::get<ty::struct_info>(return_type_info.data);
@@ -745,10 +788,10 @@ void instruction_emitter::collect_imports()
                 {
                     if(instr->get_args().size() != 1)
                     {
-                        throw emitter_error(
+                        throw emitter_error{
                           std::format(
                             "Expected 1 argument for 'invoke', got {}.",
-                            instr->get_args().size()));
+                            instr->get_args().size())};
                     }
 
                     const auto* arg = static_cast<const cg::function_argument*>(instr->get_args()[0].get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
@@ -756,10 +799,10 @@ void instruction_emitter::collect_imports()
                     const auto symbol_info_it = sema_env.symbol_table.find(arg->get_symbol_id());
                     if(symbol_info_it == sema_env.symbol_table.end())
                     {
-                        throw emitter_error(
+                        throw emitter_error{
                           std::format(
                             "Symbol with id {} not found in symbol table.",
-                            arg->get_symbol_id().value));
+                            arg->get_symbol_id().value)};
                     }
 
                     if(symbol_info_it->second.declaring_module != sema::symbol_info::current_module_id)
@@ -767,11 +810,11 @@ void instruction_emitter::collect_imports()
                         auto declaring_module_symbol_it = sema_env.symbol_table.find(symbol_info_it->second.declaring_module);
                         if(declaring_module_symbol_it == sema_env.symbol_table.end())
                         {
-                            throw emitter_error(
+                            throw emitter_error{
                               std::format(
                                 "Could not find symbol for module with id {} for symbol '{}'.",
                                 symbol_info_it->second.declaring_module.value,
-                                symbol_info_it->second.qualified_name));
+                                symbol_info_it->second.qualified_name)};
                         }
 
                         std::string function_name = name::unqualified_name(
@@ -789,24 +832,28 @@ void instruction_emitter::collect_imports()
                 {
                     if(instr->get_args().size() != 1)
                     {
-                        throw emitter_error(
+                        throw emitter_error{
                           std::format(
                             "Expected 1 argument for '{}', got {}.",
                             instr->get_name(),
-                            instr->get_args().size()));
+                            instr->get_args().size())};
                     }
 
                     const auto* arg = static_cast<const cg::type_argument*>(instr->get_args()[0].get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
                     auto lowered_type = arg->get_lowered_type();
                     if(!lowered_type.get_type_id().has_value())
                     {
-                        throw emitter_error(
+                        throw emitter_error{
                           std::format(
                             "Lowered type '{}' carries no type id.",
-                            ::cg::to_string(lowered_type.get_type_kind())));
+                            ::cg::to_string(lowered_type.get_type_kind()))};
                     }
 
-                    auto info = type_ctx.get_type_info(lowered_type.get_type_id().value());
+                    auto info = ty::throw_or(
+                      type_ctx.get_type_info(lowered_type.get_type_id().value()),
+                      std::format(
+                        "Type with id '{}' not found.",
+                        lowered_type.get_type_id().value()));
                     if(info.kind == ty::type_kind::struct_)
                     {
                         const auto& struct_info = std::get<ty::struct_info>(info.data);
@@ -838,12 +885,18 @@ static std::optional<std::size_t> get_import_index_or_nullopt(
 {
     if(!t.get_type_id().has_value())
     {
-        throw emitter_error(
-          "Type had no id during emission.");
+        throw emitter_error{
+          "Type had no id during emission."};
     }
 
-    auto info = type_ctx.get_type_info(
-      type_ctx.get_base_type(t.get_type_id().value()));
+    const auto base_type_id = ty::throw_or(
+      type_ctx.get_base_type(t.get_type_id().value()),
+      std::format(
+        "Could not get base type of type id '{}'.",
+        t.get_type_id().value()));
+    auto info = ty::throw_or(
+      type_ctx.get_type_info(base_type_id),
+      std::format("Type with id '{}' not found.", base_type_id));
 
     if(info.kind != ty::type_kind::struct_)
     {
@@ -866,10 +919,10 @@ static std::optional<std::size_t> get_import_index_or_nullopt(
       });
     if(it == sema_env.symbol_table.cend())
     {
-        throw emitter_error(
+        throw emitter_error{
           std::format(
             "Struct '{}' not found in symbol table.",
-            struct_info.qualified_name.value()));
+            struct_info.qualified_name.value())};
     }
 
     if(it->second.declaring_module == sema::symbol_info::current_module_id)
@@ -947,20 +1000,20 @@ void instruction_emitter::emit_instruction(
     auto it = instruction_info.find(name);
     if(it == instruction_info.end())
     {
-        throw emitter_error(
+        throw emitter_error{
           std::format(
             "Unknown instruction '{}'.",
-            name));
+            name)};
     }
 
     if(it->second != args.size())
     {
-        throw emitter_error(
+        throw emitter_error{
           std::format(
             "Expected {} argument(s) for '{}', got {}.",
             it->second,
             name,
-            args.size()));
+            args.size())};
     }
 
     auto emit_typed =
@@ -998,21 +1051,21 @@ void instruction_emitter::emit_instruction(
         {
             if(!ref_opcode.has_value())
             {
-                throw std::runtime_error(
+                throw emitter_error{
                   std::format(
                     "Invalid reference type for instruction '{}'.",
-                    name));
+                    name)};
             }
 
             emit(instruction_buffer, *ref_opcode);
         }
         else
         {
-            throw std::runtime_error(
+            throw emitter_error{
               std::format(
                 "Invalid type '{}' for instruction '{}'.",
                 cg::to_string(arg->get_lowered_type().get_type_kind()),
-                name));
+                name)};
         }
     };
 
@@ -1029,10 +1082,10 @@ void instruction_emitter::emit_instruction(
 
         if(!v->has_symbol_id())
         {
-            throw std::runtime_error(
+            throw emitter_error{
               std::format(
                 "Cannot emit instruction '{}': Argument value has no symbol id.",
-                name));
+                name)};
         }
         vle_int index{
           utils::numeric_cast<std::int64_t>(
@@ -1072,7 +1125,11 @@ void instruction_emitter::emit_instruction(
         }
         else
         {
-            throw std::runtime_error(std::format("Invalid type '{}' for instruction '{}'.", v->get_type().to_string(), name));
+            throw emitter_error{
+              std::format(
+                "Invalid type '{}' for instruction '{}'.",
+                v->get_type().to_string(),
+                name)};
         }
 
         instruction_buffer & index;
@@ -1109,10 +1166,10 @@ void instruction_emitter::emit_instruction(
         }
         else
         {
-            throw std::runtime_error(
+            throw emitter_error{
               std::format(
                 "Invalid type '{}' for instruction 'mod'.",
-                cg::to_string(arg->get_lowered_type().get_type_kind())));
+                cg::to_string(arg->get_lowered_type().get_type_kind()))};
         }
     }
     else if(name == "neg")
@@ -1174,10 +1231,10 @@ void instruction_emitter::emit_instruction(
             auto it = constant_map.find(id);
             if(it == constant_map.end())
             {
-                throw emitter_error(
+                throw emitter_error{
                   std::format(
                     "Constant with id '{}' not in constant map.",
-                    id));
+                    id)};
             }
 
             emit(
@@ -1187,11 +1244,11 @@ void instruction_emitter::emit_instruction(
         }
         else
         {
-            throw std::runtime_error(
+            throw emitter_error{
               std::format(
                 "Invalid type '{}' for instruction '{}'.",
                 ::cg::to_string(type_kind),
-                name));
+                name)};
         }
     }
     else if(name == "load")
@@ -1249,11 +1306,11 @@ void instruction_emitter::emit_instruction(
         }
         else
         {
-            throw std::runtime_error(
+            throw emitter_error{
               std::format(
                 "Invalid type '{}' for instruction '{}'.",
                 cg::to_string(type_kind),
-                name));
+                name)};
         }
     }
     else if(name == "store_element")
@@ -1293,11 +1350,11 @@ void instruction_emitter::emit_instruction(
         }
         else
         {
-            throw std::runtime_error(
+            throw emitter_error{
               std::format(
                 "Invalid type '{}' for instruction '{}'.",
                 cg::to_string(type_kind),
-                name));
+                name)};
         }
     }
     else if(name == "dup")
@@ -1319,11 +1376,11 @@ void instruction_emitter::emit_instruction(
         }
         else
         {
-            throw std::runtime_error(
+            throw emitter_error{
               std::format(
                 "Invalid stack value type '{}' for instruction '{}'.",
                 ::slang::to_string(v),
-                name));
+                name)};
         }
     }
     else if(name == "dup_x1")
@@ -1430,7 +1487,10 @@ void instruction_emitter::emit_instruction(
             emit(instruction_buffer, opcode::d2f);
             break;
         default:
-            throw emitter_error(std::format("Invalid cast type '{}'.", ::cg::to_string(arg->get_cast())));
+            throw emitter_error{
+              std::format(
+                "Invalid cast type '{}'.",
+                ::cg::to_string(arg->get_cast()))};
         }
     }
     else if(name == "invoke")
@@ -1441,10 +1501,10 @@ void instruction_emitter::emit_instruction(
         auto it = sema_env.symbol_table.find(symbol_id);
         if(it == sema_env.symbol_table.end())
         {
-            throw emitter_error(
+            throw emitter_error{
               std::format(
                 "Could not find function with symbol id '{}' in symbol table.",
-                symbol_id.value));
+                symbol_id.value)};
         }
 
         const auto& symbol_info = it->second;
@@ -1499,15 +1559,16 @@ void instruction_emitter::emit_instruction(
         vle_int struct_index{0};
         vle_int field_index{utils::numeric_cast<std::int64_t>(arg->get_field_index())};
 
-        auto struct_type_info = type_ctx.get_type_info(
-          arg->get_struct_type_id());
+        auto struct_type_info = ty::throw_or(
+          type_ctx.get_type_info(arg->get_struct_type_id()),
+          std::format("Type with id '{}' not found.", arg->get_struct_type_id()));
         if(struct_type_info.kind != ty::type_kind::struct_)
         {
-            throw emitter_error(
+            throw emitter_error{
               std::format(
                 "Expected struct type for type id '{}', got '{}'.",
                 arg->get_struct_type_id(),
-                ty::to_string(struct_type_info.kind)));
+                ty::to_string(struct_type_info.kind))};
         }
 
         const auto& struct_info = std::get<ty::struct_info>(struct_type_info.data);
@@ -1530,15 +1591,16 @@ void instruction_emitter::emit_instruction(
         }
         else
         {
-            auto info = type_ctx.get_type_info(
-              arg->get_struct_type_id());
+            auto info = ty::throw_or(
+              type_ctx.get_type_info(arg->get_struct_type_id()),
+              std::format("Type with id '{}' not found.", arg->get_struct_type_id()));
             if(info.kind != ty::type_kind::struct_)
             {
-                throw emitter_error(
+                throw emitter_error{
                   std::format(
                     "Expected struct type for type id '{}', got '{}'.",
                     arg->get_struct_type_id(),
-                    ty::to_string(info.kind)));
+                    ty::to_string(info.kind))};
             }
 
             // find struct in export table.
@@ -1558,7 +1620,10 @@ void instruction_emitter::emit_instruction(
         }
         else
         {
-            throw std::runtime_error(std::format("Unknown instruction '{}'.", name));
+            throw emitter_error{
+              std::format(
+                "Unknown instruction '{}'.",
+                name)};
         }
         instruction_buffer & struct_index;
         instruction_buffer & field_index;
@@ -1578,10 +1643,10 @@ void instruction_emitter::emit_instruction(
         }
         else
         {
-            throw std::runtime_error(
+            throw emitter_error{
               std::format(
                 "Invalid type '{}' for instruction 'and'.",
-                cg::to_string(arg->get_lowered_type().get_type_kind())));
+                cg::to_string(arg->get_lowered_type().get_type_kind()))};
         }
     }
     else if(name == "or")
@@ -1599,10 +1664,10 @@ void instruction_emitter::emit_instruction(
         }
         else
         {
-            throw std::runtime_error(
+            throw emitter_error{
               std::format(
                 "Invalid type '{}' for instruction 'or'.",
-                cg::to_string(arg->get_lowered_type().get_type_kind())));
+                cg::to_string(arg->get_lowered_type().get_type_kind()))};
         }
     }
     else if(name == "xor")
@@ -1620,10 +1685,10 @@ void instruction_emitter::emit_instruction(
         }
         else
         {
-            throw std::runtime_error(
+            throw emitter_error{
               std::format(
                 "Invalid type '{}' for instruction 'xor'.",
-                cg::to_string(arg->get_lowered_type().get_type_kind())));
+                cg::to_string(arg->get_lowered_type().get_type_kind()))};
         }
     }
     else if(name == "shl")
@@ -1641,10 +1706,10 @@ void instruction_emitter::emit_instruction(
         }
         else
         {
-            throw std::runtime_error(
+            throw emitter_error{
               std::format(
                 "Invalid type '{}' for instruction 'shl'.",
-                cg::to_string(arg->get_lowered_type().get_type_kind())));
+                cg::to_string(arg->get_lowered_type().get_type_kind()))};
         }
     }
     else if(name == "shr")
@@ -1662,10 +1727,10 @@ void instruction_emitter::emit_instruction(
         }
         else
         {
-            throw std::runtime_error(
+            throw emitter_error{
               std::format(
                 "Invalid type '{}' for instruction 'shr'.",
-                cg::to_string(arg->get_lowered_type().get_type_kind())));
+                cg::to_string(arg->get_lowered_type().get_type_kind()))};
         }
     }
     else if(name == "cmpl")
@@ -1728,13 +1793,19 @@ void instruction_emitter::emit_instruction(
         auto then_it = jump_targets.find(then_label);
         if(then_it == jump_targets.end())
         {
-            throw emitter_error(std::format("Cannot find label '{}'.", then_label));
+            throw emitter_error{
+              std::format(
+                "Cannot find label '{}'.",
+                then_label)};
         }
 
         auto else_it = jump_targets.find(else_label);
         if(else_it == jump_targets.end())
         {
-            throw emitter_error(std::format("Cannot find label '{}'.", else_label));
+            throw emitter_error{
+              std::format(
+                "Cannot find label '{}'.",
+                else_label)};
         }
 
         vle_int then_index{std::distance(jump_targets.begin(), then_it)};
@@ -1752,7 +1823,10 @@ void instruction_emitter::emit_instruction(
         auto it = jump_targets.find(label);
         if(it == jump_targets.end())
         {
-            throw emitter_error(std::format("Cannot find label '{}'.", label));
+            throw emitter_error{
+              std::format(
+                "Cannot find label '{}'.",
+                label)};
         }
 
         vle_int index{std::distance(jump_targets.begin(), it)};
@@ -1768,24 +1842,25 @@ void instruction_emitter::emit_instruction(
 
         if(!type.get_type_id().has_value())
         {
-            throw std::runtime_error(
+            throw emitter_error{
               std::format(
                 "Cannot emit instruction '{}': No type specified.",
-                name));
+                name)};
         }
 
         // resolve type to index.
         vle_int struct_index{0};
 
-        auto struct_type_info = type_ctx.get_type_info(
-          type.get_type_id().value());
+        auto struct_type_info = ty::throw_or(
+          type_ctx.get_type_info(type.get_type_id().value()),
+          std::format("Type with id '{}' not found.", type.get_type_id().value()));
         if(struct_type_info.kind != ty::type_kind::struct_)
         {
-            throw emitter_error(
+            throw emitter_error{
               std::format(
                 "Expected struct type for type id '{}', got '{}'.",
                 type.get_type_id().value(),
-                ty::to_string(struct_type_info.kind)));
+                ty::to_string(struct_type_info.kind))};
         }
 
         const auto& struct_info = std::get<ty::struct_info>(struct_type_info.data);
@@ -1799,10 +1874,10 @@ void instruction_emitter::emit_instruction(
 
             if(!import_index.has_value())
             {
-                throw emitter_error(
+                throw emitter_error{
                   std::format(
                     "Cannot find type '{}' in import table.",
-                    struct_info.qualified_name.value()));
+                    struct_info.qualified_name.value())};
             }
             struct_index = vle_int{
               -utils::numeric_cast<std::int64_t>(import_index.value()) - 1};
@@ -1830,7 +1905,10 @@ void instruction_emitter::emit_instruction(
         }
         else
         {
-            throw std::runtime_error(std::format("Unknown instruction '{}'.", name));
+            throw emitter_error{
+              std::format(
+                "Unknown instruction '{}'.",
+                name)};
         }
 
         instruction_buffer & struct_index;
@@ -1878,9 +1956,10 @@ void instruction_emitter::emit_instruction(
                 return module_::array_type::str;
             }
 
-            throw std::runtime_error(std::format(
-              "Unknown array type '{}' for newarray.",
-              ::cg::to_string(type_kind)));
+            throw emitter_error{
+              std::format(
+                "Unknown array type '{}' for newarray.",
+                ::cg::to_string(type_kind))};
         }();
 
         emit(instruction_buffer, opcode::newarray);
@@ -1892,8 +1971,10 @@ void instruction_emitter::emit_instruction(
     }
     else
     {
-        // TODO
-        throw std::runtime_error(std::format("instruction_emitter::emit_instruction: instruction generation for '{}' not implemented.", name));
+        throw emitter_error{
+          std::format(
+            "instruction_emitter::emit_instruction: instruction generation for '{}' not implemented.",
+            name)};
     }
 }
 
@@ -1931,10 +2012,10 @@ static module_::constant_type to_module_constant(const_::constant_type type)
         return module_::constant_type::str;
     }
 
-    throw emitter_error(
+    throw emitter_error{
       std::format(
         "Cannot convert constant to constant type with id '{}'.",
-        std::to_underlying(type)));
+        std::to_underlying(type))};
 }
 
 /**
@@ -1982,10 +2063,10 @@ static module_::constant_data_type
         return std::get<std::string>(data);
     }
 
-    throw emitter_error(
+    throw emitter_error{
       std::format(
         "Cannot convert constant to constant type with id '{}'.",
-        std::to_underlying(type)));
+        std::to_underlying(type))};
 }
 
 void instruction_emitter::run()
@@ -2051,8 +2132,19 @@ void instruction_emitter::run()
             continue;
         }
 
-        const auto& type_info = type_ctx.get_type_info(
-          type_ctx.get_type(symbol_info.name));
+        std::optional<ty::type_id> type_id = type_ctx.get_type(symbol_info.name);
+        if(!type_id.has_value())
+        {
+            throw emitter_error{
+              symbol_info.loc,
+              std::format(
+                "Type '{}' not found.",
+                symbol_info.name)};
+        }
+
+        const auto& type_info = ty::throw_or(
+          type_ctx.get_type_info(type_id.value()),
+          std::format("Type with id '{}' not found.", type_id.value()));
 
         const auto& struct_info = std::get<ty::struct_info>(type_info.data);
         exports.add_struct(*this, struct_info);
@@ -2065,16 +2157,20 @@ void instruction_emitter::run()
 
         if(!signature_ret_type.get_type_id().has_value())
         {
-            throw emitter_error(
+            throw emitter_error{
               std::format(
                 "{}: No return type.",
-                f->get_name()));
+                f->get_name())};
         }
 
         auto type_id = signature_ret_type.get_type_id().value();
-        auto base_type_id = type_ctx.get_base_type(type_id);
+        auto base_type_id = ty::throw_or(
+          type_ctx.get_base_type(type_id),
+          std::format("Could not get base type of type id '{}'.", type_id));
         bool is_array = type_ctx.is_array(type_id);
-        auto array_rank = type_ctx.get_array_rank(type_id);
+        auto array_rank = ty::throw_or(
+          type_ctx.get_array_rank(type_id),
+          std::format("Could not get array rank of type id '{}'.", type_id));
 
         module_::variable_type return_type = {
           type_ctx.to_string(base_type_id),
@@ -2094,9 +2190,13 @@ void instruction_emitter::run()
             [this](const cg::type& t) -> module_::variable_type
             { 
                 auto type_id = t.get_type_id().value();
-                auto base_type_id = type_ctx.get_base_type(type_id);
+                auto base_type_id = ty::throw_or(
+                  type_ctx.get_base_type(type_id),
+                  std::format("Could not get base type of type id '{}'.", type_id));
                 bool is_array = type_ctx.is_array(type_id);
-                auto array_rank = type_ctx.get_array_rank(type_id);
+                auto array_rank = ty::throw_or(
+                  type_ctx.get_array_rank(type_id),
+                  std::format("Could not get array rank of type id '{}'.", type_id));
                 
                 return {
                     type_ctx.to_string(base_type_id),
@@ -2176,35 +2276,39 @@ void instruction_emitter::run()
                 auto info_it = sema_env.symbol_table.find(sym_id);
                 if(info_it != sema_env.symbol_table.end())
                 {
-                    throw emitter_error(
+                    throw emitter_error{
                       std::format(
                         "{}: Tried to map local '{}' with index '{}' multiple times.",
                         f->get_name(),
                         info_it->second.name,
-                        index));
+                        index)};
                 }
 
-                throw emitter_error(
+                throw emitter_error{
                   std::format(
                     "{}: Tried to map local with index '{}' multiple times.",
                     f->get_name(),
-                    index));
+                    index)};
             }
             unset_indices.erase(index);
 
             if(!ty.get_type_id().has_value())
             {
-                throw emitter_error(
+                throw emitter_error{
                   std::format(
                     "{}: Argument {} has no symbol id.",
                     f->get_name(),
-                    index));
+                    index)};
             }
 
             auto type_id = ty.get_type_id().value();
-            auto base_type_id = type_ctx.get_base_type(type_id);
+            auto base_type_id = ty::throw_or(
+              type_ctx.get_base_type(type_id),
+              std::format("Could not get base type of type id '{}'.", type_id));
             bool is_array = type_ctx.is_array(type_id);
-            auto array_rank = type_ctx.get_array_rank(type_id);
+            auto array_rank = ty::throw_or(
+              type_ctx.get_array_rank(type_id),
+              std::format("Could not get array rank of type id '{}'.", type_id));
 
             locals[index] = module_::variable_descriptor{
               module_::variable_type{
@@ -2228,35 +2332,39 @@ void instruction_emitter::run()
                 auto info_it = sema_env.symbol_table.find(sym_id);
                 if(info_it != sema_env.symbol_table.end())
                 {
-                    throw emitter_error(
+                    throw emitter_error{
                       std::format(
                         "{}: Tried to map local '{}' with index '{}' multiple times.",
                         f->get_name(),
                         info_it->second.name,
-                        index));
+                        index)};
                 }
 
-                throw emitter_error(
+                throw emitter_error{
                   std::format(
                     "{}: Tried to map local with index '{}' multiple times.",
                     f->get_name(),
-                    index));
+                    index)};
             }
             unset_indices.erase(index);
 
             if(!ty.get_type_id().has_value())
             {
-                throw emitter_error(
+                throw emitter_error{
                   std::format(
                     "{}: Local {} has no symbol id.",
                     f->get_name(),
-                    index));
+                    index)};
             }
 
             auto type_id = ty.get_type_id().value();
-            auto base_type_id = type_ctx.get_base_type(type_id);
+            auto base_type_id = ty::throw_or(
+              type_ctx.get_base_type(type_id),
+              std::format("Could not get base type of type id '{}'.", type_id));
             bool is_array = type_ctx.is_array(type_id);
-            auto array_rank = type_ctx.get_array_rank(type_id);
+            auto array_rank = ty::throw_or(
+              type_ctx.get_array_rank(type_id),
+              std::format("Could not get array rank of type id '{}'.", type_id));
 
             locals[index] = module_::variable_descriptor{
               module_::variable_type{
@@ -2274,10 +2382,10 @@ void instruction_emitter::run()
 
         if(!unset_indices.empty())
         {
-            throw emitter_error(
+            throw emitter_error{
               std::format(
                 "Inconsistent local count for function '{}'.",
-                f->get_name()));
+                f->get_name())};
         }
 
         /*
@@ -2324,17 +2432,17 @@ void instruction_emitter::run()
     // check that the import and export counts did not change.
     if(import_count != imports.size())
     {
-        throw emitter_error(
+        throw emitter_error{
           std::format(
             "Import count changed during instruction emission ({} -> {}).",
-            import_count, imports.size()));
+            import_count, imports.size())};
     }
     if(export_count != exports.size())
     {
-        throw emitter_error(
+        throw emitter_error{
           std::format(
             "Export count changed during instruction emission ({} -> {}).",
-            export_count, exports.size()));
+            export_count, exports.size())};
     }
 }
 

@@ -19,6 +19,7 @@
 #include "shared/location.h"
 #include "shared/token.h"
 #include "attribute.h"
+#include "errors.h"
 #include "syntax_context.h"
 #include "type.h"
 
@@ -39,9 +40,15 @@ using slang::attribs::attribute_info;
 using slang::attribs::attribute_kind;
 
 /** Semantic error. */
-class semantic_error : public std::runtime_error
+struct semantic_error : public source_error
 {
-    using std::runtime_error::runtime_error;
+    using source_error::source_error;
+};
+
+/** Name resolution error. */
+struct name_error : public source_error
+{
+    using source_error::source_error;
 };
 
 /** Symbol type. */
@@ -301,6 +308,18 @@ struct env
     std::optional<symbol_id> get_symbol_id(
       const std::string& qualified_name,
       symbol_type type) const;
+
+    /**
+     * Get all visible symbol names from a scope and the symbol table.
+     *
+     * @param id The scope id to search from.
+     * @param type Optional symbol type filter.
+     * @returns Returns a sorted list of unique visible symbol names.
+     */
+    [[nodiscard]]
+    std::vector<std::string> get_visible_symbol_names(
+      scope_id id,
+      std::optional<symbol_type> type = std::nullopt) const;
 
     /**
      * Add attribute.

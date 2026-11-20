@@ -15,13 +15,21 @@
 #include <string>
 #include <string_view>
 
+#include "compiler/errors.h"
+
 namespace slang::name
 {
 
-/** A name error. */
-class name_error : public std::runtime_error
+/**
+ * A name invariant violation.
+ *
+ * Raised on malformed names (an empty unqualified variant, or an unqualified
+ * name where a qualified one is required). These are internal compiler
+ * conditions, not user errors.
+ */
+class name_error : public internal_error
 {
-    using std::runtime_error::runtime_error;
+    using internal_error::internal_error;
 };
 
 /**
