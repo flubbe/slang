@@ -263,7 +263,7 @@ public:
     std::string format(
       const diagnostic& diag) const;
 
-    /** Format all diagnostics to a string, separated by newlines. */
+    /** Format all diagnostics to a string, separated by blank lines. */
     std::string format_all() const;
 
     /**
@@ -279,7 +279,8 @@ public:
      * Emit all diagnostics to a stream.
      *
      * @param stream The stream to write to.
-     * @param with_summary Whether to append the error/warning count line.
+     * @param with_summary Whether to append the error/warning count line,
+     *         preceded by a blank line when there are diagnostics.
      */
     void emit_all(
       std::FILE* stream = stderr,

@@ -397,6 +397,12 @@ std::vector<std::string> context::get_type_names() const
         }
     }
 
+    // Offer imported types as candidates too.
+    for(const auto& name: imported_type_names)
+    {
+        names.push_back(name);
+    }
+
     std::ranges::sort(names);
     auto [first, last] = std::ranges::unique(names);
     names.erase(first, last);

@@ -5200,11 +5200,9 @@ void prototype_ast::declare(ty::context& ctx, sema::env& env)
           std::get<2>(arg)->get_qualified_name());
         if(!type.has_value())
         {
-            throw ty::type_error{
+            throw ctx.make_type_not_found_error(
               std::get<2>(arg)->get_location(),
-              std::format(
-                "Type '{}' not found.",
-                std::get<2>(arg)->get_qualified_name())};
+              std::get<2>(arg)->get_qualified_name());
         }
 
         if(std::get<2>(arg)->is_array())
@@ -5220,11 +5218,9 @@ void prototype_ast::declare(ty::context& ctx, sema::env& env)
       return_type->get_qualified_name());
     if(!type_id.has_value())
     {
-        throw ty::type_error{
+        throw ctx.make_type_not_found_error(
           return_type->get_location(),
-          std::format(
-            "Type '{}' not found.",
-            return_type->get_qualified_name())};
+          return_type->get_qualified_name());
     }
 
     return_type_id = type_id.value();
@@ -5857,11 +5853,9 @@ std::optional<ty::type_id> call_expression::type_check(
         {
             // FIXME should this be an internal error? It's more a type resolution error.
             //       it should be an internal error if types were checked at module import.
-            throw ty::type_error{
+            throw ctx.make_type_not_found_error(
               loc,
-              std::format(
-                "Type '{}' not found.",
-                qualified_type_str)};
+              qualified_type_str);
         }
 
         return_type = type.value();
@@ -5901,11 +5895,9 @@ std::optional<ty::type_id> call_expression::type_check(
                 //       it should be an internal error if types were checked at module import.
 
                 // Attach the call-site location as the best available source location.
-                throw ty::type_error{
+                throw ctx.make_type_not_found_error(
                   callee.location,
-                  std::format(
-                    "Type '{}' not found.",
-                    type_str)};
+                  type_str);
             }
 
             if(desc.signature.arg_types[i].is_array())

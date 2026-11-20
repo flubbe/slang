@@ -316,6 +316,20 @@ set_tests_properties("slang type typo suggest"
     WILL_FAIL TRUE
     FAIL_REGULAR_EXPRESSION "did you mean `custom_type`")
 
+add_my_test(
+  "slang type import typo suggest" slang compile test/fail/test_type_import_typo_fail)
+set_tests_properties("slang type import typo suggest"
+    PROPERTIES
+    WILL_FAIL TRUE
+    FIXTURES_REQUIRED needs_std
+    FAIL_REGULAR_EXPRESSION "did you mean `std::result`")
+
+add_my_test("slang func typo suggest" slang compile test/fail/test_func_typo_fail)
+set_tests_properties("slang func typo suggest"
+    PROPERTIES
+    WILL_FAIL TRUE
+    FAIL_REGULAR_EXPRESSION "did you mean `std::println`")
+
 add_compile_exec_test("slang conversions" TRUE test/test_conversions)
 add_jit_compile_test("slang conversions" TRUE test/test_conversions)
 

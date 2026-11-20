@@ -211,6 +211,12 @@ class context
       expression_types;
 
     /**
+     * Names of types imported from other modules, offered to `get_type_names`
+     * as "did you mean" candidates.
+     */
+    std::vector<std::string> imported_type_names;
+
+    /**
      * Generate a new type id.
      *
      * @returns Returns a new type id.
@@ -343,8 +349,20 @@ public:
     std::optional<type_id> get_type(
       const std::string& name) const;
 
-    /** Get all known type names (both builtin and structs). */
+    /** Get all known type names (both builtin and structs, incl. imports). */
     [[nodiscard]] std::vector<std::string> get_type_names() const;
+
+    /**
+     * Record an imported type name for "did you mean" suggestions.
+     *
+     * @param name The imported type's (qualified) name.
+     */
+    void add_imported_type_name(
+      std::string name)
+    {
+        imported_type_names.emplace_back(
+          std::move(name));
+    }
 
     /**
      * Create a located `type_error` for an unknown type, computing a

@@ -425,9 +425,16 @@ std::string context::format(
 std::string context::format_all() const
 {
     std::string out;
+    bool first = true;
     for(const auto& diag: diagnostics)
     {
+        // Separate consecutive diagnostics with a blank line.
+        if(!first)
+        {
+            out += "\n";
+        }
         out += format(diag);
+        first = false;
     }
     return out;
 }
@@ -458,7 +465,16 @@ void context::emit_all(
     std::string out = format_all();
     if(with_summary)
     {
-        out += format_summary();
+        std::string summary = format_summary();
+        if(!summary.empty())
+        {
+            // Separate the summary from the diagnostics with a blank line.
+            if(!out.empty())
+            {
+                out += "\n";
+            }
+            out += summary;
+        }
     }
     std::print(stream, "{}", out);
 }

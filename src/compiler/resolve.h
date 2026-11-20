@@ -244,6 +244,27 @@ public:
       std::optional<sema::symbol_type> type = std::nullopt) const
     {
         auto names = sema_env.get_visible_symbol_names(scope_id, type);
+
+        // Also include symbols visible through imported modules, so that a
+        // misspelled imported name is offered as a candidate. The symbol is
+        // listed under its qualified name (e.g. `std::println`), which is how
+        // imported symbols are written in source -- this also lets a mistyped
+        // namespace (`sttd::println`) match the closest imported symbol.
+        for(const auto& [mid, module_env]: module_envs)
+        {
+            for(const auto& [sym_id, info]: module_env.symbol_table)
+            {
+                if(type.has_value() && info.type != *type)
+                {
+                    continue;
+                }
+
+                names.push_back(
+                  info.qualified_name.empty() ? info.name
+                                              : info.qualified_name);
+            }
+        }
+
         if(!type.has_value()
            || type == sema::symbol_type::type)
         {
@@ -252,11 +273,11 @@ public:
               names.end(),
               type_names.begin(),
               type_names.end());
-
-            std::ranges::sort(names);
-            auto [first, last] = std::ranges::unique(names);
-            names.erase(first, last);
         }
+
+        std::ranges::sort(names);
+        auto [first, last] = std::ranges::unique(names);
+        names.erase(first, last);
 
         return names;
     }

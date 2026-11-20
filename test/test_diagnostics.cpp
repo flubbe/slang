@@ -138,4 +138,56 @@ TEST(diagnostics, warnings_and_notes)
     EXPECT_EQ(formatted, expected);
 }
 
+TEST(diagnostics, multiple_errors_separated_by_blank_lines)
+{
+    diag::context ctx;
+    const std::string filename = "multi.sl";
+    const std::string content =
+      "fn test() -> i32\n"
+      "{\n"
+      "    let a: i32 = 1;\n"
+      "    a();\n"
+      "    bar();\n"
+      "}\n";
+
+    ctx.register_file(filename, content);
+
+    auto& d1 = ctx.report_error(
+      filename,
+      diag::source_span{slang::source_location{4, 5}, 1},
+      "unknown function `a`",
+      "E0001");
+    d1.with_label("unknown function")
+      .with_help("did you mean `ab`?");
+
+    auto& d2 = ctx.report_error(
+      filename,
+      diag::source_span{slang::source_location{5, 5}, 3},
+      "unknown function `bar`",
+      "E0002");
+    d2.with_label("unknown function")
+      .with_help("did you mean `baz`?");
+
+    std::string formatted = ctx.format_all();
+
+    const std::string expected =
+      "error[E0001]: unknown function `a`\n"
+      "  --> multi.sl:4:5\n"
+      "   |\n"
+      " 4 |     a();\n"
+      "   |     ^ unknown function\n"
+      "   |\n"
+      "help: did you mean `ab`?\n"
+      "\n"
+      "error[E0002]: unknown function `bar`\n"
+      "  --> multi.sl:5:5\n"
+      "   |\n"
+      " 5 |     bar();\n"
+      "   |     ^^^ unknown function\n"
+      "   |\n"
+      "help: did you mean `baz`?\n";
+
+    EXPECT_EQ(formatted, expected);
+}
+
 }    // namespace

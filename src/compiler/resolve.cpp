@@ -904,6 +904,25 @@ void context::resolve_imports(
         resolved_modules.insert({id, &loader});
         module_envs.insert({id, std::move(import_env)});
     }
+
+    // Offer imported type names as "did you mean" candidates. Imported types
+    // are otherwise only registered in the type context when actually used, so
+    // a misspelled imported type would be missing from the suggestion list.
+    for(const auto& [mod_index, module_env]: module_envs)
+    {
+        for(const auto& [sym, info]: module_env.symbol_table)
+        {
+            if(info.type != sema::symbol_type::type)
+            {
+                continue;
+            }
+
+            type_ctx.add_imported_type_name(
+              info.qualified_name.empty()
+                ? info.name
+                : info.qualified_name);
+        }
+    }
 }
 
 }    // namespace slang::resolve
