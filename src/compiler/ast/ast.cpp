@@ -1491,15 +1491,17 @@ std::unique_ptr<cg::rvalue> access_expression::emit_rvalue(
     // validate expression.
     if(!expr_type.has_value())
     {
-        throw cg::codegen_error(loc, "Access expression has no type.");
+        throw internal_error{
+          std::format(
+            "{}: Access expression has no type.",
+            slang::to_string(loc))};
     }
     if(!rhs)
     {
-        throw cg::codegen_error(loc, "Access expression has no r.h.s.");
-    }
-    if(!struct_type.has_value())
-    {
-        throw cg::codegen_error(loc, "Access expression has no struct type.");
+        throw internal_error{
+          std::format(
+            "{}: Access expression has no r.h.s.",
+            slang::to_string(loc))};
     }
 
     auto lhs_value = lhs->emit_rvalue(ctx, true);
@@ -1507,14 +1509,15 @@ std::unique_ptr<cg::rvalue> access_expression::emit_rvalue(
     /*
      * arrays.
      */
+
     if(lhs_is_array)
     {
         if(!rhs->is_named_expression())
         {
-            throw cg::codegen_error(
-              loc,
+            throw internal_error{
               std::format(
-                "Could not find name for element access in array access expression."));
+                "{}: Could not find name for element access in array access expression.",
+                slang::to_string(loc))};
         }
         auto* identifier_expr = rhs->as_named_expression();
 
@@ -1525,23 +1528,33 @@ std::unique_ptr<cg::rvalue> access_expression::emit_rvalue(
               cg::type{cg::type_kind::i32});
         }
 
-        throw cg::codegen_error(
-          rhs->get_location(),
+        throw internal_error{
           std::format(
-            "Unknown array property '{}'.",
-            identifier_expr->get_name()));
+            "{}: Unknown array property '{}'.",
+            slang::to_string(identifier_expr->get_location()),
+            identifier_expr->get_name())};
     }
 
     /*
      * structs.
      */
 
+    if(!struct_type.has_value())
+    {
+        throw internal_error{
+          std::format(
+            "{}: Access expression has no struct type.",
+            slang::to_string(loc))};
+    }
+
     // generate access instructions for rhs.
     if(!rhs->is_named_expression())
     {
-        return rhs->emit_rvalue(ctx);
+        throw internal_error{
+          std::format(
+            "{}: Expected a named expression for struct member access.",
+            slang::to_string(rhs->get_location()))};
     }
-
     auto type = cg::type{struct_type.value(), cg::type_kind::ref};
 
     ctx.generate_get_field(
@@ -1953,20 +1966,20 @@ std::unique_ptr<cg::lvalue> variable_reference_expression::emit_lvalue(
 {
     if(!symbol_id.has_value())
     {
-        throw ty::type_error(
-          loc,
+        throw internal_error{
           std::format(
-            "Reference '{}' has no symbol id.",
-            name.s));
+            "{}: Reference '{}' has no symbol id.",
+            slang::to_string(loc),
+            name.s)};
     }
 
     if(!expr_type.has_value())
     {
-        throw cg::codegen_error(
-          loc,
+        throw internal_error{
           std::format(
-            "Reference '{}' has no type.",
-            name.s));
+            "{}: Reference '{}' has no type.",
+            slang::to_string(loc),
+            name.s)};
     }
 
     // check for macro expansions first.
@@ -1979,12 +1992,12 @@ std::unique_ptr<cg::lvalue> variable_reference_expression::emit_lvalue(
     auto it = sema_env.symbol_table.find(symbol_id.value());
     if(it == sema_env.symbol_table.cend())
     {
-        throw cg::codegen_error(
-          loc,
+        throw internal_error{
           std::format(
-            "{}: Reference not found in symbol table (symbol id: {}).",
+            "{}: {}: Reference not found in symbol table (symbol id: {}).",
+            slang::to_string(loc),
             get_name(),
-            symbol_id.value().value));
+            symbol_id.value().value)};
     }
 
     const auto& info = it->second;
@@ -1993,11 +2006,11 @@ std::unique_ptr<cg::lvalue> variable_reference_expression::emit_lvalue(
     {
     case sema::symbol_type::constant:
     {
-        throw cg::codegen_error(
-          loc,
+        throw internal_error{
           std::format(
-            "Cannot assign to constant '{}'.",
-            info.name));
+            "{}: Cannot assign to constant '{}'.",
+            slang::to_string(loc),
+            info.name)};
     }
 
     case sema::symbol_type::variable:
@@ -2016,11 +2029,11 @@ std::unique_ptr<cg::lvalue> variable_reference_expression::emit_lvalue(
         // fall-through.
     }
 
-    throw cg::codegen_error(
-      loc,
+    throw internal_error{
       std::format(
-        "Identifier '{}' is not a value.",
-        info.name));
+        "{}: Identifier '{}' is not a value.",
+        slang::to_string(loc),
+        info.name)};
 }
 
 std::unique_ptr<cg::rvalue> variable_reference_expression::emit_rvalue(
@@ -2029,20 +2042,20 @@ std::unique_ptr<cg::rvalue> variable_reference_expression::emit_rvalue(
 {
     if(!symbol_id.has_value())
     {
-        throw ty::type_error(
-          loc,
+        throw internal_error{
           std::format(
-            "Reference '{}' has no symbol id.",
-            name.s));
+            "{}: Reference '{}' has no symbol id.",
+            slang::to_string(loc),
+            name.s)};
     }
 
     if(!expr_type.has_value())
     {
-        throw cg::codegen_error(
-          loc,
+        throw internal_error{
           std::format(
-            "Reference '{}' has no type.",
-            name.s));
+            "{}: Reference '{}' has no type.",
+            slang::to_string(loc),
+            name.s)};
     }
 
     // check for macro expansions first.
@@ -2055,12 +2068,12 @@ std::unique_ptr<cg::rvalue> variable_reference_expression::emit_rvalue(
     auto it = sema_env.symbol_table.find(symbol_id.value());
     if(it == sema_env.symbol_table.cend())
     {
-        throw cg::codegen_error(
-          loc,
+        throw internal_error{
           std::format(
-            "{}: Reference not found in symbol table (symbol id: {}).",
+            "{}: {}: Reference not found in symbol table (symbol id: {}).",
+            slang::to_string(loc),
             get_name(),
-            symbol_id.value().value));
+            symbol_id.value().value)};
     }
 
     const auto& info = it->second;
@@ -2072,11 +2085,11 @@ std::unique_ptr<cg::rvalue> variable_reference_expression::emit_rvalue(
         auto const_info = ctx.get_const_env().get_const_info(symbol_id.value());
         if(!const_info.has_value())
         {
-            throw cg::codegen_error(
-              loc,
+            throw internal_error{
               std::format(
-                "Could not find constant info for '{}'.",
-                info.name));
+                "{}: Could not find constant info for '{}'.",
+                slang::to_string(loc),
+                info.name)};
         }
 
         if(const_info->type == const_::constant_type::i32)
@@ -2132,10 +2145,11 @@ std::unique_ptr<cg::rvalue> variable_reference_expression::emit_rvalue(
         }
 
         // unsupported type.
-        throw cg::codegen_error(
+        throw internal_error{
           std::format(
-            "Unsupported constant type '{}'.",
-            std::to_underlying(const_info->type)));
+            "{}: Unsupported constant type '{}'.",
+            slang::to_string(loc),
+            const_::to_string(const_info->type))};
     }
 
     case sema::symbol_type::variable:
@@ -2155,11 +2169,11 @@ std::unique_ptr<cg::rvalue> variable_reference_expression::emit_rvalue(
         // fall-through.
     }
 
-    throw cg::codegen_error(
-      loc,
+    throw internal_error{
       std::format(
-        "Identifier '{}' is not a value.",
-        info.name));
+        "{}: Identifier '{}' is not a value.",
+        slang::to_string(loc),
+        info.name)};
 }
 
 void variable_reference_expression::collect_names(co::context& ctx)
@@ -2637,9 +2651,10 @@ void constant_declaration_expression::generate_code(
     if(env.const_eval_expr_values.find(expr.get())
        == env.const_eval_expr_values.cend())
     {
-        throw cg::codegen_error(
+        // TODO This should likey be caught in in earlier pass.
+        throw cg::codegen_error{
           expr->get_location(),
-          "Expression in constant declaration is not compile-time computable.");
+          "Expression in constant declaration is not compile-time computable."};
     }
 }
 
@@ -2756,17 +2771,17 @@ std::unique_ptr<cg::rvalue> array_initializer_expression::emit_rvalue(
   cg::context& ctx,
   [[maybe_unused]] bool result_used) const
 {
-    std::unique_ptr<cg::rvalue> v;
     auto array_type = ctx.get_declaration_type();
     auto element_type = ctx.deref(array_type);
 
     if(exprs.size() >= std::numeric_limits<std::int32_t>::max())
     {
-        throw cg::codegen_error(
+        throw internal_error{
           std::format(
-            "Cannot generate code for array initializer list: list size exceeds numeric limits ({} >= {}).",
+            "{}: Cannot generate code for array initializer list: list size exceeds numeric limits ({} >= {}).",
+            slang::to_string(exprs.front()->get_location()),
             exprs.size(),
-            std::numeric_limits<std::int32_t>::max()));
+            std::numeric_limits<std::int32_t>::max())};
     }
 
     ctx.generate_const(
@@ -2775,6 +2790,10 @@ std::unique_ptr<cg::rvalue> array_initializer_expression::emit_rvalue(
     ctx.generate_newarray(
       element_type);
 
+    // Element-type consistency is enforced in type_check (which throws a
+    // ty::type_error on a mismatch), so it is not re-validated in codegen.
+    // Don't add a check against element_type: emitted values carry e.g. the i32/i64
+    // stack representation, not the language element type (e.g. i16 -> i32).
     for(std::size_t i = 0; i < exprs.size(); ++i)
     {
         const auto& expr = exprs[i];
@@ -2785,40 +2804,14 @@ std::unique_ptr<cg::rvalue> array_initializer_expression::emit_rvalue(
           {cg::type_kind::i32},
           static_cast<int>(i));
 
-        auto expr_value = expr->emit_rvalue(ctx, true);
-        if(i >= std::numeric_limits<std::int32_t>::max())
-        {
-            throw cg::codegen_error(
-              loc,
-              std::format(
-                "Array index exceeds max i32 size ({}).",
-                std::numeric_limits<std::int32_t>::max()));
-        }
-
+        expr->emit_rvalue(ctx, true);
         ctx.generate_store(
           cg::lvalue{
             element_type,
             cg::array_location_info{}});
-
-        if(!v)
-        {
-            v = std::move(expr_value);
-        }
-        else
-        {
-            if(v->get_type() != expr_value->get_type())
-            {
-                throw cg::codegen_error(
-                  loc,
-                  std::format(
-                    "Inconsistent types in array initialization: '{}' and '{}'.",
-                    v->get_type().to_string(),
-                    expr_value->get_type().to_string()));
-            }
-        }
     }
 
-    return v;
+    return std::make_unique<cg::rvalue>(element_type);
 }
 
 void array_initializer_expression::collect_names(co::context& ctx)
@@ -3036,19 +3029,20 @@ std::unique_ptr<cg::rvalue> struct_anonymous_initializer_expression::emit_rvalue
 {
     if(!expr_type.has_value())
     {
-        throw cg::codegen_error(
-          loc,
-          "Anonymous struct initializer has no type.");
+        throw internal_error{
+          std::format(
+            "{}: Anonymous struct initializer has no type.",
+            slang::to_string(loc))};
     }
 
     if(initializers.size() != fields.size())
     {
-        throw cg::codegen_error(
-          loc,
+        throw internal_error{
           std::format(
-            "Inconsistent struct initialization: {} initializers, {} fields.",
+            "{}: Inconsistent struct initialization: {} initializers, {} fields.",
+            slang::to_string(loc),
             initializers.size(),
-            fields.size()));
+            fields.size())};
     }
 
     cg::type struct_type = ctx.lower(expr_type.value());
@@ -3066,26 +3060,28 @@ std::unique_ptr<cg::rvalue> struct_anonymous_initializer_expression::emit_rvalue
 
         if(!initializer_value)
         {
-            throw cg::codegen_error(
-              loc,
+            // NOTE Field name unresolved, because that would need the typing context.
+            throw internal_error{
               std::format(
-                "Code generation for '{}.{}' initialization returned no type.",
+                "{}: Code generation for '{}.{}' initialization returned no type.",
+                slang::to_string(loc),
                 name.s,
-                field_info.field_index));    // FIXME Resolve field name.
+                field_info.field_index)};
         }
         if(initializer_value->get_type() != member_type
            && initializer_value->get_type().get_type_kind() == cg::type_kind::null
            && member_type.get_type_kind() != cg::type_kind::str
            && member_type.get_type_kind() != cg::type_kind::ref)
         {
-            throw cg::codegen_error(
-              loc,
+            // NOTE Field name unresolved, because that would need the typing context.
+            throw internal_error{
               std::format(
-                "Code generation for '{}.{}' initialization returned '{}' (expected '{}').",
+                "{}: Code generation for '{}.{}' initialization returned '{}' (expected '{}').",
+                slang::to_string(loc),
                 name.s,
-                field_info.field_index,    // FIXME Resolve field name.
+                field_info.field_index,
                 ::cg::to_string(initializer_value->get_type().get_type_kind()),
-                ::cg::to_string(member_type.get_type_kind())));
+                ::cg::to_string(member_type.get_type_kind()))};
         }
 
         ctx.generate_set_field(
@@ -3264,19 +3260,20 @@ std::unique_ptr<cg::rvalue> struct_named_initializer_expression::emit_rvalue(
 {
     if(!expr_type.has_value())
     {
-        throw cg::codegen_error(
-          loc,
-          "Named struct initializer has no type.");
+        throw internal_error{
+          std::format(
+            "{}: Named struct initializer has no type.",
+            slang::to_string(loc))};
     }
 
     if(initializers.size() != fields.size())
     {
-        throw cg::codegen_error(
-          loc,
+        throw internal_error{
           std::format(
-            "Inconsistent struct initialization: {} initializers, {} fields.",
+            "{}: Inconsistent struct initialization: {} initializers, {} fields.",
+            slang::to_string(loc),
             initializers.size(),
-            fields.size()));
+            fields.size())};
     }
 
     cg::type struct_type = ctx.lower(expr_type.value());
@@ -3297,26 +3294,29 @@ std::unique_ptr<cg::rvalue> struct_named_initializer_expression::emit_rvalue(
 
         if(!initializer_value)
         {
-            throw cg::codegen_error(
-              loc,
+            // NOTE Field name unresolved, because that would need the typing context.
+            throw internal_error{
               std::format(
-                "Code generation for '{}.{}' initialization returned no type.",
+                "{}: Code generation for '{}.{}' initialization returned no type.",
+                slang::to_string(loc),
                 name.s,
-                field_info.field_index));    // FIXME Resolve field name.
+                field_info.field_index)};
         }
+
         if(initializer_value->get_type() != member_type
            && initializer_value->get_type().get_type_kind() == cg::type_kind::null
            && member_type.get_type_kind() != cg::type_kind::str
            && member_type.get_type_kind() != cg::type_kind::ref)
         {
-            throw cg::codegen_error(
-              loc,
+            // NOTE Field name unresolved, because that would need the typing context.
+            throw internal_error{
               std::format(
-                "Code generation for '{}.{}' initialization returned '{}' (expected '{}').",
+                "{}: Code generation for '{}.{}' initialization returned '{}' (expected '{}').",
+                slang::to_string(loc),
                 name.s,
-                field_info.field_index,    // FIXME Resolve field name.
+                field_info.field_index,
                 ::cg::to_string(initializer_value->get_type().get_type_kind()),
-                ::cg::to_string(member_type.get_type_kind())));
+                ::cg::to_string(member_type.get_type_kind()))};
         }
 
         ctx.generate_set_field(
@@ -3961,11 +3961,11 @@ static std::optional<std::int64_t> get_const_i32(
     const auto& info = it->second;
     if(info.type != const_::constant_type::i32)
     {
-        throw cg::codegen_error(
-          expr.get_location(),
+        throw internal_error{
           std::format(
-            "Expected constant expression to be of type 'i32', got '{}'.",
-            const_::to_string(info.type)));
+            "{}: Expected constant expression to be of type 'i32', got '{}'.",
+            slang::to_string(expr.get_location()),
+            const_::to_string(info.type))};
     }
 
     return std::get<std::int64_t>(info.value);
@@ -4506,7 +4506,7 @@ bool unary_expression::is_pure(cg::context& ctx) const
  * @param loc Source location of the add.
  * @param ty Type to emit an add for.
  * @param add Whether to add.
- * @throws Throws a `cg::codegen_error` if the type is not one of `i8`, `i16`, `i32`, `i64`, `f32` or `f64`.
+ * @throws Throws a `internal_error` if the type is not one of `i8`, `i16`, `i32`, `i64`, `f32` or `f64`.
  */
 static void emit_addsub_one(
   cg::context& ctx,
@@ -4541,11 +4541,11 @@ static void emit_addsub_one(
     }
     else
     {
-        throw cg::codegen_error(
-          loc,
+        throw internal_error{
           std::format(
-            "Wrong expression type '{}' for prefix operator '++'. Expected 'i32', 'i64', 'f32' or 'f64'.",
-            ty.to_string()));
+            "{}: Wrong expression type '{}' for prefix operator '++'. Expected 'i32', 'i64', 'f32' or 'f64'.",
+            slang::to_string(loc),
+            ty.to_string())};
     }
 
     ctx.generate_binary_op(cg::binary_op::op_add, ty);
@@ -4656,11 +4656,11 @@ std::unique_ptr<cg::rvalue> unary_expression::emit_rvalue(
         }
         else
         {
-            throw cg::codegen_error(
-              loc,
+            throw internal_error{
               std::format(
-                "Type error for unary operator '-': Expected 'i8', 'i16', 'i32', 'i64', 'f32' or 'f64', got '{}'.",
-                v->get_type().to_string()));
+                "{}: Type error for unary operator '-': Expected 'i8', 'i16', 'i32', 'i64', 'f32' or 'f64', got '{}'.",
+                slang::to_string(loc),
+                v->get_type().to_string())};
         }
 
         return v;
@@ -4672,11 +4672,11 @@ std::unique_ptr<cg::rvalue> unary_expression::emit_rvalue(
         if(v->get_type().get_type_kind() != cg::type_kind::i32
            && v->get_type().get_type_kind() != cg::type_kind::i64)
         {
-            throw cg::codegen_error(
-              loc,
+            throw internal_error{
               std::format(
-                "Type error for unary operator '!': Expected 'i32' or 'i64', got '{}'.",
-                v->get_type().to_string()));
+                "{}: Type error for unary operator '!': Expected 'i32' or 'i64', got '{}'.",
+                slang::to_string(loc),
+                v->get_type().to_string())};
         }
 
         ctx.generate_const({v->get_type().get_type_kind()}, 0);
@@ -4705,11 +4705,11 @@ std::unique_ptr<cg::rvalue> unary_expression::emit_rvalue(
                 return cg::type_kind::i64;
             }
 
-            throw cg::codegen_error(
-              loc,
+            throw internal_error{
               std::format(
-                "Type error for unary operator '~': Expected 'i8', 'i16', 'i32' or 'i64', got '{}'.",
-                v->get_type().to_string()));
+                "{}: Type error for unary operator '~': Expected 'i8', 'i16', 'i32' or 'i64', got '{}'.",
+                slang::to_string(loc),
+                v->get_type().to_string())};
         }();
 
         std::vector<std::unique_ptr<cg::argument>> args;
@@ -4840,20 +4840,21 @@ std::unique_ptr<cg::rvalue> new_expression::emit_rvalue(
     cg::type element_type = ctx.lower(type_expr->get_type());
     if(element_type.get_type_kind() == cg::type_kind::void_)
     {
-        throw cg::codegen_error(
-          loc,
-          "Cannot create array with elements of type 'void'.");
+        throw internal_error{
+          std::format(
+            "{}: Cannot create array with elements of type 'void'.",
+            slang::to_string(loc))};
     }
 
     // generate array size.
     std::unique_ptr<cg::rvalue> v = array_length_expr->emit_rvalue(ctx, true);
     if(v->get_type().get_type_kind() != cg::type_kind::i32)
     {
-        throw cg::codegen_error(
-          loc,
+        throw internal_error{
           std::format(
-            "Expected <integer> as array size, got '{}'.",
-            v->get_type().to_string()));
+            "{}: Expected <integer> as array size, got '{}'.",
+            slang::to_string(loc),
+            v->get_type().to_string())};
     }
 
     if(element_type.get_type_kind() == cg::type_kind::i8
@@ -5068,11 +5069,11 @@ std::unique_ptr<cg::rvalue> postfix_expression::emit_rvalue(
         }
         else
         {
-            throw cg::codegen_error(
-              op.location,
+            throw internal_error{
               std::format(
-                "Unknown variable type for postfix operator '{}'.",
-                op.s));
+                "{}: Unknown variable type for postfix operator '{}'.",
+                slang::to_string(op.location),
+                op.s)};
         }
 
         if(op.s == "++")
@@ -5088,11 +5089,11 @@ std::unique_ptr<cg::rvalue> postfix_expression::emit_rvalue(
     }
     else
     {
-        throw cg::codegen_error(
-          op.location,
+        throw internal_error{
           std::format(
-            "Unknown postfix operator '{}'.",
-            op.s));
+            "{}: Unknown postfix operator '{}'.",
+            slang::to_string(op.location),
+            op.s)};
     }
 
     if(result_used)
@@ -5450,11 +5451,11 @@ void function_expression::generate_code(
 {
     if(!symbol_id.has_value())
     {
-        throw ty::type_error(
-          loc,
+        throw internal_error{
           std::format(
-            "Function '{}' has no symbol id.",
-            prototype->get_name()));
+            "{}: Function '{}' has no symbol id.",
+            slang::to_string(loc),
+            prototype->get_name())};
     }
 
     if(!ctx.get_sema_env().has_attribute(
@@ -5493,11 +5494,11 @@ void function_expression::generate_code(
 
         if(!body)
         {
-            throw cg::codegen_error(
-              loc,
+            throw internal_error{
               std::format(
-                "No function body defined for '{}'.",
-                prototype->get_name()));
+                "{}: No function body defined for '{}'.",
+                slang::to_string(loc),
+                prototype->get_name())};
         }
 
         auto v = body->emit_rvalue(ctx);
@@ -5505,9 +5506,10 @@ void function_expression::generate_code(
         // verify that the break-continue-stack is empty.
         if(ctx.get_break_continue_stack_size() != 0)
         {
-            throw cg::codegen_error(
-              loc,
-              "Internal error: Break-continue stack is not empty.");
+            throw internal_error{
+              std::format(
+                "{}: Internal error: Break-continue stack is not empty.",
+                slang::to_string(loc))};
         }
 
         auto* ip = ctx.get_insertion_point();
@@ -5527,6 +5529,7 @@ void function_expression::generate_code(
             }
             else
             {
+                // TODO Should be in caught by semantic analysis
                 throw cg::codegen_error(
                   loc,
                   std::format(
@@ -5539,6 +5542,7 @@ void function_expression::generate_code(
     }
     else
     {
+        // TODO Move annotations to semantic analysis
         auto native_payload = ctx.get_sema_env().get_attribute_payload(    // checked above // NOLINT(bugprone-unchecked-optional-access)
                                                   symbol_id.value(),
                                                   attribs::attribute_kind::native)
@@ -5705,11 +5709,11 @@ std::unique_ptr<cg::rvalue> call_expression::emit_rvalue(
 {
     if(!symbol_id.has_value())
     {
-        throw ty::type_error(
-          loc,
+        throw internal_error{
           std::format(
-            "Callee '{}' has no symbol id.",
-            callee.s));
+            "{}: Callee '{}' has no symbol id.",
+            slang::to_string(loc),
+            callee.s)};
     }
 
     for(const auto& arg: args)
@@ -5761,11 +5765,11 @@ std::optional<ty::type_id> call_expression::type_check(
 {
     if(!symbol_id.has_value())
     {
-        throw ty::type_error(
-          loc,
+        throw internal_error{
           std::format(
-            "Function '{}' has no symbol id.",
-            callee.s));
+            "{}: Function '{}' has no symbol id.",
+            slang::to_string(loc),
+            callee.s)};
     }
 
     const auto& callee_symbol_info = env.symbol_table[symbol_id.value()];
@@ -5778,11 +5782,11 @@ std::optional<ty::type_id> call_expression::type_check(
 
     if(!callee_symbol_info.reference.has_value())
     {
-        throw ty::type_error(
-          loc,
+        throw internal_error{
           std::format(
-            "Function '{}' has no reference.",
-            callee.s));
+            "{}: Function '{}' has no reference.",
+            slang::to_string(loc),
+            callee.s)};
     }
 
     if(callee_symbol_info.declaring_module == sema::symbol_info::current_module_id)
@@ -6167,11 +6171,11 @@ void if_statement::generate_code(
     auto condition_v = condition->emit_rvalue(ctx, true);
     if(condition_v->get_type().get_type_kind() != cg::type_kind::i32)
     {
-        throw cg::codegen_error(
-          loc,
+        throw internal_error{
           std::format(
-            "Expected if condition to be of type 'i32', got '{}.'",
-            condition_v->get_type().to_string()));
+            "{}: Expected if condition to be of type 'i32', got '{}.'",
+            slang::to_string(loc),
+            condition_v->get_type().to_string())};
     }
 
     // store where to insert the branch.
@@ -6358,11 +6362,11 @@ void while_statement::generate_code(
     auto v = condition->emit_rvalue(ctx, true);
     if(v->get_type().get_type_kind() != cg::type_kind::i32)
     {
-        throw cg::codegen_error(
-          loc,
+        throw internal_error{
           std::format(
-            "Expected while condition to be of type 'i32', got '{}'.",
-            v->get_type().to_string()));
+            "{}: Expected while condition to be of type 'i32', got '{}'.",
+            slang::to_string(loc),
+            v->get_type().to_string())};
     }
 
     ctx.generate_cond_branch(body_basic_block, merge_basic_block);

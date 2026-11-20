@@ -300,6 +300,7 @@ add_jit_compile_test("slang cast" TRUE test/test_cast)
 add_compile_exec_fail_test("slang cast fail" TRUE test/test_cast_fail)
 
 add_compile_fail_test("slang const assign fail" FALSE test/test_const_assign_fail)
+add_compile_fail_test("slang const eval fail" FALSE test/test_const_eval_fail)
 
 add_compile_exec_test("slang const export" TRUE test/test_const_export)
 add_jit_compile_test("slang const export" TRUE test/test_const_export)
@@ -434,6 +435,8 @@ add_jit_compile_test("slang strings" TRUE test/test_strings)
 
 add_compile_exec_test("slang structs" TRUE test/test_structs)
 add_jit_compile_test("slang structs" TRUE test/test_structs)
+
+add_compile_fail_test("slang struct init fail" FALSE test/test_struct_init_fail)
 
 add_compile_exec_test("slang struct import" TRUE test/test_struct_import)
 add_jit_compile_test("slang struct import" TRUE test/test_struct_import)
