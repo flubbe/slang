@@ -643,8 +643,7 @@ void instruction_emitter::collect_imports()
         std::optional<ty::type_id> type_id = type_ctx.get_type(symbol_info.name);
         if(!type_id.has_value())
         {
-            // FIXME emitter_error?
-            throw ty::type_error{
+            throw internal_error{
               symbol_info.loc,
               std::format(
                 "Type '{}' not found.",
@@ -2093,8 +2092,7 @@ void instruction_emitter::run()
         std::optional<ty::type_id> type_id = type_ctx.get_type(symbol_info.name);
         if(!type_id.has_value())
         {
-            // FIXME emitter_error?
-            throw ty::type_error{
+            throw internal_error{
               symbol_info.loc,
               std::format(
                 "Type '{}' not found.",

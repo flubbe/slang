@@ -740,11 +740,11 @@ std::optional<ty::type_id> literal_expression::type_check(
         {
             if(tok.suffix.value().ty != suffix_type::integer)
             {
-                throw ty::type_error(
+                throw ty::type_error{
                   loc,
                   std::format(
                     "Invalid suffix '{}' for integer literal.",
-                    slang::to_string(tok.suffix.value().ty)));
+                    slang::to_string(tok.suffix.value().ty))};
             }
 
             switch(tok.suffix.value().width)
@@ -753,13 +753,13 @@ std::optional<ty::type_id> literal_expression::type_check(
                 if(!utils::fits_in<std::int8_t>(
                      std::get<std::int64_t>(tok.value.value())))
                 {
-                    throw ty::type_error(
+                    throw ty::type_error{
                       loc,
                       std::format(
                         "Integer literal '{}' does not fit in type 'i8' with value range {} to {}.",
                         std::get<std::int64_t>(tok.value.value()),
                         std::numeric_limits<std::int8_t>::min(),
-                        std::numeric_limits<std::int8_t>::max()));
+                        std::numeric_limits<std::int8_t>::max())};
                 }
 
                 expr_type = ctx.get_i8_type();
@@ -768,13 +768,13 @@ std::optional<ty::type_id> literal_expression::type_check(
                 if(!utils::fits_in<std::int16_t>(
                      std::get<std::int64_t>(tok.value.value())))
                 {
-                    throw ty::type_error(
+                    throw ty::type_error{
                       loc,
                       std::format(
                         "Integer literal '{}' does not fit in type 'i16' with value range {} to {}.",
                         std::get<std::int64_t>(tok.value.value()),
                         std::numeric_limits<std::int16_t>::min(),
-                        std::numeric_limits<std::int16_t>::max()));
+                        std::numeric_limits<std::int16_t>::max())};
                 }
 
                 expr_type = ctx.get_i16_type();
@@ -783,13 +783,13 @@ std::optional<ty::type_id> literal_expression::type_check(
                 if(!utils::fits_in<std::int32_t>(
                      std::get<std::int64_t>(tok.value.value())))
                 {
-                    throw ty::type_error(
+                    throw ty::type_error{
                       loc,
                       std::format(
                         "Integer literal '{}' does not fit in type 'i32' with value range {} to {}.",
                         std::get<std::int64_t>(tok.value.value()),
                         std::numeric_limits<std::int32_t>::min(),
-                        std::numeric_limits<std::int32_t>::max()));
+                        std::numeric_limits<std::int32_t>::max())};
                 }
 
                 expr_type = ctx.get_i32_type();
@@ -798,11 +798,11 @@ std::optional<ty::type_id> literal_expression::type_check(
                 expr_type = ctx.get_i64_type();
                 break;
             default:
-                throw ty::type_error(
+                throw ty::type_error{
                   loc,
                   std::format(
                     "Invalid width '{}' in integer literal.",
-                    tok.suffix.value().width));
+                    tok.suffix.value().width)};
             }
         }
         else
@@ -816,11 +816,11 @@ std::optional<ty::type_id> literal_expression::type_check(
         {
             if(tok.suffix.value().ty != suffix_type::floating_point)
             {
-                throw ty::type_error(
+                throw ty::type_error{
                   loc,
                   std::format(
                     "Invalid suffix '{}' for floating point literal.",
-                    slang::to_string(tok.suffix.value().ty)));
+                    slang::to_string(tok.suffix.value().ty))};
             }
 
             switch(tok.suffix.value().width)
@@ -834,13 +834,13 @@ std::optional<ty::type_id> literal_expression::type_check(
                 if(!std::isfinite(narrowed)
                    && std::isfinite(v))
                 {
-                    throw ty::type_error(
+                    throw ty::type_error{
                       loc,
                       std::format(
                         "Floating point literal '{}' cannot be represented as f32 (overflow to infinity). Valid finite range: {} to {}.",
                         tok.s,
                         std::numeric_limits<float>::min(),
-                        std::numeric_limits<float>::max()));
+                        std::numeric_limits<float>::max())};
                 }
 
                 if(narrowed == 0.0f
@@ -861,11 +861,11 @@ std::optional<ty::type_id> literal_expression::type_check(
                 break;
 
             default:
-                throw ty::type_error(
+                throw ty::type_error{
                   loc,
                   std::format(
                     "Invalid width '{}' in floating point literal.",
-                    tok.suffix.value().width));
+                    tok.suffix.value().width)};
             }
         }
         else
@@ -879,11 +879,11 @@ std::optional<ty::type_id> literal_expression::type_check(
     }
     else
     {
-        throw ty::type_error(
+        throw internal_error{
           tok.location,
           std::format(
-            "Unknown literal type with id '{}'.",
-            std::to_underlying(tok.type)));
+            "Unknown literal type '{}'.",
+            slang::to_string(tok.type))};
     }
 
     ctx.set_expression_type_or_throw(*this, expr_type);
@@ -1198,7 +1198,9 @@ std::optional<ty::type_id> type_cast_expression::type_check(
     auto type = expr->type_check(ctx, env);
     if(!type.has_value())
     {
-        throw ty::type_error(loc, "Type cast expression has no type.");
+        throw internal_error{
+          loc,
+          "Type cast expression has no type."};
     }
 
     // casts for primitive types.
@@ -1266,11 +1268,11 @@ std::optional<ty::type_id> type_cast_expression::type_check(
           target_type->get_type());
         if(cast_to == cast_from->second.end())
         {
-            throw ty::type_error(
+            throw ty::type_error{
               loc,
               std::format(
                 "Invalid cast to non-primitive type '{}'.",
-                target_type->get_name()));
+                target_type->get_name())};
         }
     }
 
@@ -1364,9 +1366,9 @@ std::optional<ty::type_id> namespace_access_expression::type_check(
     expr_type = expr->type_check(ctx, env);
     if(!expr_type.has_value())
     {
-        throw ty::type_error(
+        throw internal_error{
           loc,
-          "Type check: Expression has no type in namespace access.");
+          "Type check: Expression has no type in namespace access."};
     }
     ctx.set_expression_type_or_throw(*this, expr_type);
     return expr_type;
@@ -1565,20 +1567,20 @@ std::optional<ty::type_id> access_expression::type_check(
     auto type = lhs->type_check(ctx, env);
     if(!type.has_value())
     {
-        throw ty::type_error(
+        throw internal_error{
           loc,
-          "L.h.s. has no value in element access expression.");
+          "L.h.s. has no value in element access expression."};
     }
 
     lhs_is_array = ctx.is_array(type.value());
     if(!lhs_is_array
        && !ctx.is_struct(type.value()))
     {
-        throw ty::type_error(
+        throw ty::type_error{
           loc,
           std::format(
             "Base type '{}' is not a struct or array.",
-            ctx.to_string(type.value())));
+            ctx.to_string(type.value()))};
     }
 
     if(ctx.is_struct(type.value()))
@@ -1586,11 +1588,11 @@ std::optional<ty::type_id> access_expression::type_check(
         const ty::struct_info* si = ctx.get_struct_info(type.value());
         if(si == nullptr)
         {
-            throw ty::type_error(
+            throw internal_error{
               loc,
               std::format(
-                "Type '{}' is not a struct.",
-                ctx.to_string(type.value())));
+                "Struct '{}' has no associated info.",
+                ctx.to_string(type.value()))};
         }
         struct_info = *si;
     }
@@ -1610,23 +1612,23 @@ std::optional<ty::type_id> access_expression::type_check(
     std::optional<std::size_t> fi = ctx.get_field_index(type.value(), identifier_node->get_name());
     if(!fi.has_value())
     {
-        throw ty::type_error(
+        throw ty::type_error{
           loc,
           std::format(
             "No field '{}' found in struct '{}'.",
             identifier_node->get_name(),
-            ctx.to_string(type.value())));
+            ctx.to_string(type.value()))};
     }
     field_index = fi.value();
     std::optional<ty::type_id> ft = ctx.get_field_type(type.value(), field_index);
     if(!ft.has_value())
     {
-        throw ty::type_error(
+        throw ty::type_error{
           loc,
           std::format(
             "No field type found for field '{}' in struct '{}'.",
             identifier_node->get_name(),
-            ctx.to_string(type.value())));
+            ctx.to_string(type.value()))};
     }
     expr_type = ft.value();
     ctx.set_expression_type_or_throw(*this, expr_type);
@@ -1643,9 +1645,9 @@ ty::type_id access_expression::get_struct_type() const
 {
     if(!struct_type.has_value())
     {
-        throw ty::type_error(
+        throw internal_error{
           loc,
-          "No struct type set for element access.");
+          "No struct type set for element access."};
     }
 
     return struct_type.value();
@@ -2183,9 +2185,9 @@ std::optional<ty::type_id> variable_reference_expression::type_check(
             std::optional<ty::type_id> t = expansion->type_check(ctx, env);
             if(!t.has_value())
             {
-                throw ty::type_error(
+                throw internal_error{
                   expansion->get_location(),
-                  "Expression has no type.");
+                  "Expression has no type."};
             }
 
             return t.value();
@@ -2193,20 +2195,20 @@ std::optional<ty::type_id> variable_reference_expression::type_check(
 
         if(!symbol_id.has_value())
         {
-            throw ty::type_error(
+            throw internal_error{
               loc,
               std::format(
                 "Identifier '{}' has no symbol id.",
-                get_qualified_name()));
+                get_qualified_name())};
         }
 
         if(!env.type_map.contains(symbol_id.value()))
         {
-            throw ty::type_error(
+            throw internal_error{
               loc,
               std::format(
                 "Identifier '{}' not in type map.",
-                get_qualified_name()));
+                get_qualified_name())};
         }
 
         return env.type_map[symbol_id.value()];
@@ -2297,36 +2299,36 @@ std::optional<ty::type_id> array_subscript_expression::type_check(
     auto lhs_type = lhs->type_check(ctx, env);
     if(!lhs_type.has_value())
     {
-        throw ty::type_error(
+        throw internal_error{
           lhs->get_location(),
-          "Expression has no type.");
+          "Expression has no type."};
     }
 
     if(!ctx.is_array(lhs_type.value()))
     {
-        throw ty::type_error(
+        throw ty::type_error{
           loc,
           std::format(
             "Cannot use subscript on non-array type '{}'.",
-            ctx.to_string(lhs_type.value())));
+            ctx.to_string(lhs_type.value()))};
     }
 
     auto subscript_type = subscript_expr->type_check(ctx, env);
     if(!subscript_type.has_value())
     {
-        throw ty::type_error(
+        throw ty::type_error{
           subscript_expr->get_location(),
-          "Subscript expression has no type.");
+          "Subscript expression has no type."};
     }
     if(!ctx.are_types_compatible(
          ctx.get_i32_type(),
          subscript_type.value()))
     {
-        throw ty::type_error(
+        throw ty::type_error{
           subscript_expr->get_location(),
           std::format(
             "Expected <integer> for array element access, got '{}'.",
-            ctx.to_string(subscript_type.value())));
+            ctx.to_string(subscript_type.value()))};
     }
 
     expr_type = ctx.array_element_type(lhs_type.value());
@@ -2367,7 +2369,7 @@ void type_expression::type_check(
         auto array_type_id = ctx.get_array(type_id, 1);
         if(!array_type_id.value())
         {
-            throw ty::type_error{
+            throw internal_error{
               get_location(),
               std::format(
                 "Could not create array type from '{}'.",
@@ -2466,11 +2468,11 @@ void variable_declaration_expression::generate_code(
 {
     if(!symbol_id.has_value())
     {
-        throw ty::type_error(
+        throw internal_error{
           name.location,
           std::format(
             "Variable '{}' has no symbol id.",
-            name.s));
+            name.s)};
     }
 
     auto lowered_type = ctx.lower(type->get_type());
@@ -2509,11 +2511,11 @@ std::optional<ty::type_id> variable_declaration_expression::type_check(
 
     if(!symbol_id.has_value())
     {
-        throw ty::type_error(
+        throw internal_error{
           name.location,
           std::format(
             "Variable '{}' has no symbol id.",
-            name.s));
+            name.s)};
     }
 
     type->type_check(ctx, env);
@@ -2538,23 +2540,21 @@ std::optional<ty::type_id> variable_declaration_expression::type_check(
         auto rhs = expr->type_check(ctx, env);
         if(!rhs.has_value())
         {
-            throw ty::type_error(
+            throw internal_error{
               loc,
-              "Expression has no type.");
+              "Expression has no type."};
         }
 
         ctx.set_expression_type_or_throw(*expr.get(), rhs);
 
         if(!ctx.are_types_compatible(annotated_type_id.value(), rhs.value()))
         {
-            throw ty::type_error(
+            throw ty::type_error{
               name.location,
               std::format(
-                "R.h.s. has type '{}' (type id {}), which does not match the variable's type '{}' (type id {}).",
+                "R.h.s. has type '{}', which does not match the variable's type '{}'.",
                 ctx.to_string(rhs.value()),
-                rhs.value(),
-                ctx.to_string(annotated_type_id.value()),
-                annotated_type_id.value()));
+                ctx.to_string(annotated_type_id.value()))};
         }
     }
 
@@ -2671,11 +2671,11 @@ std::optional<ty::type_id> constant_declaration_expression::type_check(
 {
     if(!symbol_id.has_value())
     {
-        throw ty::type_error(
+        throw internal_error{
           loc,
           std::format(
             "Constant '{}' has no symbol id.",
-            name.s));
+            name.s)};
     }
 
     // Prevent double declaration of constant.
@@ -2708,22 +2708,20 @@ std::optional<ty::type_id> constant_declaration_expression::type_check(
     auto rhs = expr->type_check(ctx, env);
     if(!rhs.has_value())
     {
-        throw ty::type_error(
+        throw internal_error{
           name.location,
-          "Expression has no type.");
+          "Expression has no type."};
     }
 
     // Either the types match, or the type is a reference type which is set to 'null'.
     if(!ctx.are_types_compatible(annotated_type_id.value(), rhs.value()))
     {
-        throw ty::type_error(
+        throw ty::type_error{
           name.location,
           std::format(
-            "R.h.s. has type '{}' (type id {}), which does not match the constant's type '{}' (type id {}).",
+            "R.h.s. has type '{}', which does not match the constant's type '{}'.",
             ctx.to_string(rhs.value()),
-            rhs.value(),
-            ctx.to_string(annotated_type_id.value()),
-            annotated_type_id.value()));
+            ctx.to_string(annotated_type_id.value()))};
     }
 
     return std::nullopt;
@@ -2821,19 +2819,21 @@ std::optional<ty::type_id> array_initializer_expression::type_check(
 
         if(!type.has_value())
         {
-            throw ty::type_error(loc, "Initializer expression has no type.");
+            throw internal_error{
+              loc,
+              "Initializer expression has no type."};
         }
 
         if(element_type.has_value())
         {
             if(element_type != type)
             {
-                throw ty::type_error(
+                throw ty::type_error{
                   loc,
                   std::format(
                     "Initializer types do not match. Found '{}' and '{}'.",
                     ctx.to_string(element_type.value()),
-                    ctx.to_string(type.value())));
+                    ctx.to_string(type.value()))};
             }
         }
         else
@@ -2844,7 +2844,9 @@ std::optional<ty::type_id> array_initializer_expression::type_check(
 
     if(!element_type.has_value())
     {
-        throw ty::type_error(loc, "Initializer expression has no type.");
+        throw internal_error{
+          loc,
+          "Initializer expression has no type."};
     }
 
     expr_type = ctx.get_array(element_type.value(), 1);
@@ -2909,20 +2911,22 @@ void struct_definition_expression::declare_type(ty::context& ctx, sema::env& env
 {
     if(!symbol_id.has_value())
     {
-        throw ty::type_error(
+        throw internal_error{
           loc,
           std::format(
             "Struct definition for '{}' has no symbol id.",
-            name.s));
+            name.s)};
     }
 
     struct_type_id = ctx.declare_struct(get_name(), std::nullopt);
     ty::struct_info* si = ctx.get_struct_info(struct_type_id);
     if(si == nullptr)
     {
-        throw ty::type_error(
+        throw internal_error{
           loc,
-          std::format("Failed to declare struct '{}'.", get_name()));
+          std::format(
+            "Failed to declare struct '{}'.",
+            get_name())};
     }
 
     if(env.has_attribute(
@@ -3111,7 +3115,7 @@ std::optional<ty::type_id> struct_anonymous_initializer_expression::type_check(
     const ty::struct_info* si = ctx.get_struct_info(struct_type_id.value());
     if(si == nullptr)
     {
-        throw ty::type_error{
+        throw internal_error{
           get_location(),
           std::format(
             "Type '{}' not found.",
@@ -3120,13 +3124,13 @@ std::optional<ty::type_id> struct_anonymous_initializer_expression::type_check(
 
     if(initializers.size() != si->fields.size())
     {
-        throw ty::type_error(
+        throw ty::type_error{
           name.location,
           std::format(
             "Struct '{}' has {} member(s), but {} are initialized.",
             name.s,
             si->fields.size(),
-            initializers.size()));
+            initializers.size())};
     }
 
     for(std::size_t i = 0; i < initializers.size(); ++i)
@@ -3137,20 +3141,22 @@ std::optional<ty::type_id> struct_anonymous_initializer_expression::type_check(
         auto initializer_type = initializer->type_check(ctx, env);
         if(!initializer_type.has_value())
         {
-            throw ty::type_error(initializer->get_location(), "Initializer has no type.");
+            throw internal_error{
+              initializer->get_location(),
+              "Initializer has no type."};
         }
 
         // Either the types match, or the type is a reference types which is set to 'null'.
         if(!ctx.are_types_compatible(field.type, initializer_type.value()))
         {
-            throw ty::type_error(
+            throw ty::type_error{
               name.location,
               std::format(
                 "Struct member '{}.{}' has type '{}', but initializer has type '{}'.",
                 name.s,
                 field.name,
                 ctx.to_string(field.type),
-                ctx.to_string(initializer_type.value())));
+                ctx.to_string(initializer_type.value()))};
         }
 
         fields.emplace_back(
@@ -3344,7 +3350,7 @@ std::optional<ty::type_id> struct_named_initializer_expression::type_check(
     const ty::struct_info* si = ctx.get_struct_info(struct_type_id.value());
     if(si == nullptr)
     {
-        throw ty::type_error{
+        throw internal_error{
           get_location(),
           std::format(
             "Type '{}' not found.",
@@ -3355,13 +3361,13 @@ std::optional<ty::type_id> struct_named_initializer_expression::type_check(
 
     if(info.fields.size() != initializers.size())
     {
-        throw ty::type_error(
+        throw ty::type_error{
           name.location,
           std::format(
             "Struct '{}' has {} member(s), but {} are initialized.",
             name.s,
             info.fields.size(),
-            initializers.size()));
+            initializers.size())};
     }
 
     std::vector<std::string> initialized_member_names;    // used in check for duplicates
@@ -3375,55 +3381,55 @@ std::optional<ty::type_id> struct_named_initializer_expression::type_check(
              { return name == member_name; })
            != initialized_member_names.end())
         {
-            throw ty::type_error(
+            throw ty::type_error{
               name.location,
               std::format(
                 "Multiple initializations of struct member '{}::{}'.",
                 name.s,
-                member_name));
+                member_name)};
         }
         initialized_member_names.push_back(member_name);
 
         auto field_it = info.fields_by_name.find(member_name);
         if(field_it == info.fields_by_name.end())
         {
-            throw ty::type_error(
+            throw ty::type_error{
               name.location,
               std::format(
                 "Struct '{}' has no member '{}'.",
                 name.s,
-                member_name));
+                member_name)};
         }
         if(field_it->second >= info.fields.size())
         {
-            throw ty::type_error(
+            throw internal_error{
               name.location,
               std::format(
                 "Field index for '{}.{}' out of range.",
                 name.s,
-                member_name));
+                member_name)};
         }
 
         auto initializer_type = initializer->type_check(ctx, env);
         if(!initializer_type.has_value())
         {
-            throw ty::type_error(
+            throw internal_error{
               initializer->get_location(),
-              "Initializer has no type.");
+              "Initializer has no type."};
         }
 
         if(!ctx.are_types_compatible(
              info.fields[field_it->second].type,
              initializer_type.value()))
         {
-            throw ty::type_error(
+            throw ty::type_error{
               name.location,
               std::format(
                 "Struct member '{}.{}' has type '{}', but initializer has type '{}'.",
                 name.s,
                 member_name,
                 ctx.to_string(info.fields[field_it->second].type),
-                ctx.to_string(initializer_type.value())));
+                ctx.to_string(initializer_type.value()))};
         }
 
         fields.emplace_back(
@@ -3698,15 +3704,15 @@ std::optional<ty::type_id> assignment_expression::type_check(
 
     if(!lhs_type.has_value())
     {
-        throw ty::type_error(
+        throw internal_error{
           loc,
-          "L.h.s. in binary expression does not have a type.");
+          "L.h.s. in binary expression does not have a type."};
     }
     if(!rhs_type.has_value())
     {
-        throw ty::type_error(
+        throw internal_error{
           loc,
-          "R.h.s. in binary expression does not have a type.");
+          "R.h.s. in binary expression does not have a type."};
     }
 
     // some operations restrict the type.
@@ -3718,7 +3724,7 @@ std::optional<ty::type_id> assignment_expression::type_check(
         if((lhs_type != rhs_type
             || (lhs_type != ctx.get_i32_type() && lhs_type != ctx.get_i64_type())))
         {
-            throw ty::type_error(
+            throw ty::type_error{
               loc,
               std::format(
                 "Got binary expression of type '{}' {} '{}', expected 'i32' {} 'i32' or 'i64' {} 'i64'.",
@@ -3726,7 +3732,7 @@ std::optional<ty::type_id> assignment_expression::type_check(
                 reduced_op,
                 ctx.to_string(rhs_type.value()),
                 reduced_op,
-                reduced_op));
+                reduced_op)};
         }
 
         // set the restricted type.
@@ -3740,7 +3746,7 @@ std::optional<ty::type_id> assignment_expression::type_check(
         if((lhs_type != ctx.get_i32_type() && lhs_type != ctx.get_i64_type())
            || rhs_type != ctx.get_i32_type())
         {
-            throw ty::type_error(
+            throw ty::type_error{
               loc,
               std::format(
                 "Got shift expression of type '{}' {} '{}', expected 'i32' {} 'i32' or 'i64' {} 'i32'.",
@@ -3748,7 +3754,7 @@ std::optional<ty::type_id> assignment_expression::type_check(
                 reduced_op,
                 ctx.to_string(rhs_type.value()),
                 reduced_op,
-                reduced_op));
+                reduced_op)};
         }
 
         // disallow negative literals.
@@ -3757,18 +3763,17 @@ std::optional<ty::type_id> assignment_expression::type_check(
             const std::optional<const_value>& v = rhs->as_literal()->get_token().value;
             if(!v.has_value())
             {
-                throw ty::type_error(
+                throw internal_error{
                   loc,
-                  std::format(
-                    "R.h.s. does not have a value, but is typed as 'i32' literal."));
+                  "R.h.s. does not have a value, but is typed as 'i32' literal."};
             }
 
             if(std::get<std::int64_t>(v.value()) < 0)
             {
-                throw ty::type_error(
+                throw ty::type_error{
                   loc,
                   std::format(
-                    "Negative shift counts are not allowed."));
+                    "Negative shift counts are not allowed.")};
             }
         }
 
@@ -3783,14 +3788,14 @@ std::optional<ty::type_id> assignment_expression::type_check(
         if((lhs_type != rhs_type
             || (lhs_type != ctx.get_i32_type() && lhs_type != ctx.get_i64_type())))
         {
-            throw ty::type_error(
+            throw ty::type_error{
               loc,
               std::format(
                 "Got logical expression of type '{}' {} '{}', expected 'i32' {} 'i32'.",
                 ctx.to_string(lhs_type.value()),
                 reduced_op,
                 ctx.to_string(rhs_type.value()),
-                reduced_op));
+                reduced_op)};
         }
 
         // set the restricted type.
@@ -3807,13 +3812,13 @@ std::optional<ty::type_id> assignment_expression::type_check(
         // Either the types match, or the type is a reference types which is set to 'null'.
         if(!ctx.are_types_compatible(lhs_type.value(), rhs_type.value()))
         {
-            throw ty::type_error(
+            throw ty::type_error{
               loc,
               std::format(
                 "Types don't match in binary expression. Got expression of type '{}' {} '{}'.",
                 ctx.to_string(lhs_type.value()),
                 reduced_op,
-                ctx.to_string(rhs_type.value())));
+                ctx.to_string(rhs_type.value()))};
         }
 
         if(op.s == "=")
@@ -3838,12 +3843,12 @@ std::optional<ty::type_id> assignment_expression::type_check(
        && lhs_type.value() != ctx.get_f32_type()
        && lhs_type.value() != ctx.get_f64_type())
     {
-        throw ty::type_error(
+        throw ty::type_error{
           loc,
           std::format(
             "Expected 'i32', 'i64', 'f32' or 'f64' for l.h.s. of binary operation of type '{}', got '{}'.",
             reduced_op,
-            ctx.to_string(lhs_type.value())));
+            ctx.to_string(lhs_type.value()))};
     }
 
     if(rhs_type.value() != ctx.get_i8_type()
@@ -3853,23 +3858,23 @@ std::optional<ty::type_id> assignment_expression::type_check(
        && rhs_type.value() != ctx.get_f32_type()
        && rhs_type.value() != ctx.get_f64_type())
     {
-        throw ty::type_error(
+        throw ty::type_error{
           loc,
           std::format(
             "Expected 'i32', 'i64', 'f32' or 'f64' for r.h.s. of binary operation of type '{}', got '{}'.",
             reduced_op,
-            ctx.to_string(rhs_type.value())));
+            ctx.to_string(rhs_type.value()))};
     }
 
     if(lhs_type != rhs_type)
     {
-        throw ty::type_error(
+        throw ty::type_error{
           loc,
           std::format(
             "Types don't match in binary expression. Got expression of type '{}' {} '{}'.",
             ctx.to_string(lhs_type.value()),
             reduced_op,
-            ctx.to_string(rhs_type.value())));
+            ctx.to_string(rhs_type.value()))};
     }
 
     expr_type = lhs_type;
@@ -4272,15 +4277,15 @@ std::optional<ty::type_id> binary_expression::type_check(
 
     if(!lhs_type.has_value())
     {
-        throw ty::type_error(
+        throw internal_error{
           loc,
-          "L.h.s. in binary expression does not have a type.");
+          "L.h.s. in binary expression does not have a type."};
     }
     if(!rhs_type.has_value())
     {
-        throw ty::type_error(
+        throw internal_error{
           loc,
-          "R.h.s. in binary expression does not have a type.");
+          "R.h.s. in binary expression does not have a type."};
     }
 
     // some operations restrict the type.
@@ -4292,7 +4297,7 @@ std::optional<ty::type_id> binary_expression::type_check(
         if((lhs_type != rhs_type
             || (lhs_type != ctx.get_i32_type() && lhs_type != ctx.get_i64_type())))
         {
-            throw ty::type_error(
+            throw ty::type_error{
               loc,
               std::format(
                 "Got binary expression of type '{}' {} '{}', expected 'i32' {} 'i32' or 'i64' {} 'i64'.",
@@ -4300,7 +4305,7 @@ std::optional<ty::type_id> binary_expression::type_check(
                 op.s,
                 ctx.to_string(rhs_type.value()),
                 op.s,
-                op.s));
+                op.s)};
         }
 
         // set the restricted type.
@@ -4314,7 +4319,7 @@ std::optional<ty::type_id> binary_expression::type_check(
         if((lhs_type != ctx.get_i32_type() && lhs_type != ctx.get_i64_type())
            || rhs_type != ctx.get_i32_type())
         {
-            throw ty::type_error(
+            throw ty::type_error{
               loc,
               std::format(
                 "Got shift expression of type '{}' {} '{}', expected 'i32' {} 'i32' or 'i64' {} 'i32'.",
@@ -4322,7 +4327,7 @@ std::optional<ty::type_id> binary_expression::type_check(
                 op.s,
                 ctx.to_string(rhs_type.value()),
                 op.s,
-                op.s));
+                op.s)};
         }
 
         // disallow negative literals.
@@ -4331,18 +4336,16 @@ std::optional<ty::type_id> binary_expression::type_check(
             const std::optional<const_value>& v = rhs->as_literal()->get_token().value;
             if(!v.has_value())
             {
-                throw ty::type_error(
+                throw internal_error{
                   loc,
-                  std::format(
-                    "R.h.s. does not have a value, but is typed as 'i32' literal."));
+                  "R.h.s. does not have a value, but is typed as 'i32' literal."};
             }
 
             if(std::get<std::int64_t>(v.value()) < 0)
             {
-                throw ty::type_error(
+                throw ty::type_error{
                   loc,
-                  std::format(
-                    "Negative shift counts are not allowed."));
+                  "Negative shift counts are not allowed."};
             }
         }
 
@@ -4357,14 +4360,14 @@ std::optional<ty::type_id> binary_expression::type_check(
         if((lhs_type != rhs_type
             || (lhs_type != ctx.get_i32_type() && lhs_type != ctx.get_i64_type())))
         {
-            throw ty::type_error(
+            throw ty::type_error{
               loc,
               std::format(
                 "Got logical expression of type '{}' {} '{}', expected 'i32' {} 'i32'.",
                 ctx.to_string(lhs_type.value()),
                 op.s,
                 ctx.to_string(rhs_type.value()),
-                op.s));
+                op.s)};
         }
 
         // set the restricted type.
@@ -4380,13 +4383,13 @@ std::optional<ty::type_id> binary_expression::type_check(
         // Either the types match, or the type is a reference types which is set to 'null'.
         if(!ctx.are_types_compatible(lhs_type.value(), rhs_type.value()))
         {
-            throw ty::type_error(
+            throw ty::type_error{
               loc,
               std::format(
                 "Types don't match in binary expression. Got expression of type '{}' {} '{}'.",
                 ctx.to_string(lhs_type.value()),
                 op.s,
-                ctx.to_string(rhs_type.value())));
+                ctx.to_string(rhs_type.value()))};
         }
 
         // comparisons return i32.
@@ -4403,12 +4406,12 @@ std::optional<ty::type_id> binary_expression::type_check(
        && lhs_type.value() != ctx.get_f32_type()
        && lhs_type.value() != ctx.get_f64_type())
     {
-        throw ty::type_error(
+        throw ty::type_error{
           loc,
           std::format(
             "Expected 'i32', 'i64', 'f32' or 'f64' for l.h.s. of binary operation of type '{}', got '{}'.",
             op.s,
-            ctx.to_string(lhs_type.value())));
+            ctx.to_string(lhs_type.value()))};
     }
 
     if(rhs_type.value() != ctx.get_i8_type()
@@ -4418,23 +4421,23 @@ std::optional<ty::type_id> binary_expression::type_check(
        && rhs_type.value() != ctx.get_f32_type()
        && rhs_type.value() != ctx.get_f64_type())
     {
-        throw ty::type_error(
+        throw ty::type_error{
           loc,
           std::format(
             "Expected 'i32', 'i64', 'f32' or 'f64' for r.h.s. of binary operation of type '{}', got '{}'.",
             op.s,
-            ctx.to_string(rhs_type.value())));
+            ctx.to_string(rhs_type.value()))};
     }
 
     if(lhs_type != rhs_type)
     {
-        throw ty::type_error(
+        throw ty::type_error{
           loc,
           std::format(
             "Types don't match in binary expression. Got expression of type '{}' {} '{}'.",
             ctx.to_string(lhs_type.value()),
             op.s,
-            ctx.to_string(rhs_type.value())));
+            ctx.to_string(rhs_type.value()))};
     }
 
     if(is_comparison(op.s))
@@ -4756,30 +4759,30 @@ std::optional<ty::type_id> unary_expression::type_check(
     auto op_it = valid_operand_types.find(op.s);
     if(op_it == valid_operand_types.end())
     {
-        throw ty::type_error(
+        throw ty::type_error{
           op.location,
           std::format(
             "Unknown unary operator '{}'.",
-            op.s));
+            op.s)};
     }
 
     auto operand_type = ctx.get_expression_type(*operand);
     if(!operand_type.has_value())
     {
-        throw ty::type_error(
+        throw internal_error{
           operand->get_location(),
-          "Expression has no type.");
+          "Expression has no type."};
     }
 
     auto type_it = std::ranges::find(op_it->second, operand_type.value());
     if(type_it == op_it->second.end())
     {
-        throw ty::type_error(
+        throw ty::type_error{
           operand->get_location(),
           std::format(
             "Invalid operand type '{}' for unary operator '{}'.",
             ctx.to_string(operand_type.value()),
-            op.s));
+            op.s)};
     }
 
     expr_type = operand_type;
@@ -4886,32 +4889,32 @@ std::optional<ty::type_id> new_expression::type_check(
 
     if(!type_expr_id.has_value())
     {
-        throw ty::type_error(
+        throw internal_error{
           type_expr->get_location(),
-          "Unable to resolve type.");
+          "Unable to resolve type."};
     }
     if(type_expr_id == ctx.get_void_type())
     {
-        throw ty::type_error(
+        throw ty::type_error{
           type_expr->get_location(),
-          "Cannot use operator new with type 'void'.");
+          "Cannot use operator new with type 'void'."};
     }
 
     auto array_length_type = array_length_expr->type_check(ctx, env);
     if(!array_length_type.has_value())
     {
-        throw ty::type_error(
+        throw internal_error{
           array_length_expr->get_location(),
-          "Array size expression has no type.");
+          "Array size expression has no type."};
     }
 
     if(array_length_type != ctx.get_i32_type())
     {
-        throw ty::type_error(
+        throw ty::type_error{
           array_length_expr->get_location(),
           std::format(
             "Expected array size of type 'i32', got '{}'.",
-            ctx.to_string(array_length_type.value())));
+            ctx.to_string(array_length_type.value()))};
     }
 
     expr_type = ctx.get_array(type_expr_id.value(), 1);
@@ -5101,9 +5104,9 @@ std::optional<ty::type_id> postfix_expression::type_check(
     auto identifier_type = expr->type_check(ctx, env);
     if(!identifier_type.has_value())
     {
-        throw ty::type_error(
+        throw internal_error{
           expr->get_location(),
-          "Identifier has no type.");
+          "Identifier has no type."};
     }
 
     if(identifier_type.value() != ctx.get_i8_type()
@@ -5113,12 +5116,12 @@ std::optional<ty::type_id> postfix_expression::type_check(
        && identifier_type.value() != ctx.get_f32_type()
        && identifier_type.value() != ctx.get_f64_type())
     {
-        throw ty::type_error(
+        throw ty::type_error{
           expr->get_location(),
           std::format(
             "Postfix operator '{}' can only operate on 'i8', 'i16', 'i32', 'i64', 'f32' or 'f64' (found '{}').",
             op.s,
-            ctx.to_string(identifier_type.value())));
+            ctx.to_string(identifier_type.value()))};
     }
 
     expr_type = identifier_type;
@@ -5757,9 +5760,9 @@ std::optional<ty::type_id> call_expression::type_check(
     const auto& callee_symbol_info = env.symbol_table[symbol_id.value()];
     if(callee_symbol_info.type != sema::symbol_type::function)
     {
-        throw ty::type_error(
+        throw ty::type_error{
           loc,
-          "Expected function call.");
+          "Expected function call."};
     }
 
     if(!callee_symbol_info.reference.has_value())
@@ -5776,11 +5779,11 @@ std::optional<ty::type_id> call_expression::type_check(
         const auto* ast_node = std::get<const ast::expression*>(callee_symbol_info.reference.value());
         if(ast_node->get_id() != ast::node_identifier::function_expression)
         {
-            throw ty::type_error(
+            throw internal_error{
               loc,
               std::format(
                 "AST node for '{}' is not a function node.",
-                callee.s));
+                callee.s)};
         }
 
         const auto* function_node = static_cast<const ast::function_expression*>(ast_node);    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
@@ -5789,12 +5792,12 @@ std::optional<ty::type_id> call_expression::type_check(
 
         if(arg_type_ids.size() != args.size())
         {
-            throw ty::type_error(
+            throw ty::type_error{
               callee.location,
               std::format(
                 "Wrong number of arguments in function call. Expected {}, got {}.",
                 arg_type_ids.size(),
-                args.size()));
+                args.size())};
         }
 
         for(std::size_t i = 0; i < args.size(); ++i)
@@ -5802,19 +5805,19 @@ std::optional<ty::type_id> call_expression::type_check(
             auto arg_type = args[i]->type_check(ctx, env);
             if(!arg_type.has_value())
             {
-                throw ty::type_error(
+                throw internal_error{
                   args[i]->get_location(),
-                  "Argument does not have a type.");
+                  "Argument does not have a type."};
             }
             if(!ctx.are_types_compatible(arg_type_ids[i], arg_type.value()))
             {
-                throw ty::type_error(
+                throw ty::type_error{
                   args[i]->get_location(),
                   std::format(
                     "Type of argument {} does not match signature: Expected '{}', got '{}'.",
                     i + 1,
                     ctx.to_string(arg_type_ids[i]),
-                    ctx.to_string(arg_type.value())));
+                    ctx.to_string(arg_type.value()))};
             }
         }
     }
@@ -5825,19 +5828,19 @@ std::optional<ty::type_id> call_expression::type_check(
         const auto* exp_sym = std::get<const module_::exported_symbol*>(callee_symbol_info.reference.value());
         if(exp_sym == nullptr)
         {
-            throw ty::type_error(
+            throw internal_error{
               loc,
               std::format(
-                "Missing export entry for function '{}'.",
-                callee.s));
+                "Missing export entry reference for function '{}'.",
+                callee.s)};
         }
         if(exp_sym->type != module_::symbol_type::function)
         {
-            throw ty::type_error(
+            throw ty::type_error{
               loc,
               std::format(
                 "Exported symbol is not a function (got type '{}').",
-                module_::to_string(exp_sym->type)));
+                module_::to_string(exp_sym->type))};
         }
 
         auto desc = std::get<module_::function_descriptor>(exp_sym->desc);
@@ -5852,6 +5855,8 @@ std::optional<ty::type_id> call_expression::type_check(
         auto type = ctx.get_type(qualified_type_str);
         if(!type.has_value())
         {
+            // FIXME should this be an internal error? It's more a type resolution error.
+            //       it should be an internal error if types were checked at module import.
             throw ty::type_error{
               loc,
               std::format(
@@ -5872,12 +5877,12 @@ std::optional<ty::type_id> call_expression::type_check(
 
         if(desc.signature.arg_types.size() != args.size())
         {
-            throw ty::type_error(
+            throw ty::type_error{
               callee.location,
               std::format(
                 "Wrong number of arguments in function call. Expected {}, got {}.",
                 desc.signature.arg_types.size(),
-                args.size()));
+                args.size())};
         }
 
         for(std::size_t i = 0; i < args.size(); ++i)
@@ -5892,6 +5897,9 @@ std::optional<ty::type_id> call_expression::type_check(
             auto expected_arg_type = ctx.get_type(type_str);
             if(!expected_arg_type.has_value())
             {
+                // FIXME should this be an internal error? It's more a type resolution error.
+                //       it should be an internal error if types were checked at module import.
+
                 // Attach the call-site location as the best available source location.
                 throw ty::type_error{
                   callee.location,
@@ -5902,25 +5910,29 @@ std::optional<ty::type_id> call_expression::type_check(
 
             if(desc.signature.arg_types[i].is_array())
             {
-                expected_arg_type = ctx.get_array(expected_arg_type.value(), 1);
+                expected_arg_type = ty::throw_or(
+                  ctx.get_array(expected_arg_type.value(), 1),
+                  std::format(
+                    "Could not get array type for '{}'.",
+                    type_str));
             }
 
             auto arg_type = args[i]->type_check(ctx, env);
             if(!arg_type.has_value())
             {
-                throw ty::type_error(
+                throw internal_error{
                   args[i]->get_location(),
-                  "Argument does not have a type.");
+                  "Argument does not have a type."};
             }
             if(!ctx.are_types_compatible(expected_arg_type.value(), arg_type.value()))
             {
-                throw ty::type_error(
+                throw ty::type_error{
                   args[i]->get_location(),
                   std::format(
                     "Type of argument {} does not match signature: Expected '{}', got '{}'.",
                     i + 1,
                     ctx.to_string(expected_arg_type.value()),
-                    ctx.to_string(arg_type.value())));
+                    ctx.to_string(arg_type.value()))};
             }
         }
     }
@@ -5930,22 +5942,24 @@ std::optional<ty::type_id> call_expression::type_check(
         auto v = index_expr->type_check(ctx, env);
         if(!v.has_value())
         {
-            throw ty::type_error(
+            throw internal_error{
               index_expr->get_location(),
-              "Index expression has no type.");
+              "Index expression has no type."};
         }
         if(!ctx.are_types_compatible(ctx.get_i32_type(), v.value()))
         {
-            throw ty::type_error(
+            throw ty::type_error{
               loc,
               std::format(
                 "Expected <integer> for array element access, got '{}'.",
-                ctx.to_string(v.value())));
+                ctx.to_string(v.value()))};
         }
 
         if(!ctx.is_array(return_type))
         {
-            throw ty::type_error(loc, "Cannot use subscript on non-array type.");
+            throw ty::type_error{
+              loc,
+              "Cannot use subscript on non-array type."};
         }
 
         expr_type = ctx.array_element_type(return_type);
@@ -6044,57 +6058,60 @@ std::optional<ty::type_id> return_statement::type_check(
 {
     if(!env.current_function_name.has_value())
     {
-        throw ty::type_error(
+        throw internal_error{
           loc,
-          "Current function has no name.");
+          "Current function has no name."};
     }
     if(!env.current_function_return_type.has_value())
     {
-        throw ty::type_error(
+        // Should already be a parsing error.
+        throw internal_error{
           loc,
-          "Cannot have a return statement outside a function");
+          "Return statement encountered outside a function."};
     }
 
     if(env.current_function_return_type.value() == ctx.get_void_type())
     {
         if(expr)
         {
-            throw ty::type_error(
+            throw ty::type_error{
               loc,
               std::format(
                 "Function '{}' has return type 'void' and cannot return a value.",
-                env.current_function_name.value()));
+                env.current_function_name.value())};
         }
     }
     else
     {
         if(expr == nullptr)
         {
-            throw ty::type_error(
+            throw ty::type_error{
               loc,
               std::format(
                 "Function '{}' must return a value of type '{}'.",
                 env.current_function_name.value(),
-                ctx.to_string(env.current_function_return_type.value())));
+                ctx.to_string(env.current_function_return_type.value()))};
         }
 
         auto ret_type = expr->type_check(ctx, env);
         if(!ret_type.has_value())
         {
-            throw ty::type_error(loc, "Return expression has no type.");
+            throw internal_error{
+              loc,
+              "Return expression has no type."};
         }
 
         if(!ctx.are_types_compatible(
              env.current_function_return_type.value(),
              ret_type.value()))
         {
-            throw ty::type_error(
+            throw ty::type_error{
               loc,
               std::format(
                 "Function '{}' must return a value of type '{}', got '{}'",
                 env.current_function_name.value(),
                 ctx.to_string(env.current_function_return_type.value()),
-                ctx.to_string(ret_type.value())));
+                ctx.to_string(ret_type.value()))};
         }
     }
 
@@ -6240,16 +6257,18 @@ std::optional<ty::type_id> if_statement::type_check(
     auto condition_type = condition->type_check(ctx, env);
     if(!condition_type.has_value())
     {
-        throw ty::type_error(condition->get_location(), "Condition has no type.");
+        throw internal_error{
+          condition->get_location(),
+          "Condition has no type."};
     }
 
     if(condition_type.value() != ctx.get_i32_type())
     {
-        throw ty::type_error(
+        throw ty::type_error{
           loc,
           std::format(
             "Expected if condition to be of type 'i32', got '{}'.",
-            ctx.to_string(condition_type.value())));
+            ctx.to_string(condition_type.value()))};
     }
 
     if_block->type_check(ctx, env);
@@ -6386,16 +6405,18 @@ std::optional<ty::type_id> while_statement::type_check(
     auto condition_type = condition->type_check(ctx, env);
     if(!condition_type.has_value())
     {
-        throw ty::type_error(condition->get_location(), "Condition has no type.");
+        throw internal_error{
+          condition->get_location(),
+          "Condition has no type."};
     }
 
     if(condition_type.value() != ctx.get_i32_type())
     {
-        throw ty::type_error(
+        throw ty::type_error{
           loc,
           std::format(
             "Expected while condition to be of type 'i32', got '{}'.",
-            ctx.to_string(condition_type.value())));
+            ctx.to_string(condition_type.value()))};
     }
 
     while_block->type_check(ctx, env);

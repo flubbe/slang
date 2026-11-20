@@ -4,7 +4,7 @@
  * constant expression info, used e.g. during constant evaluation.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 

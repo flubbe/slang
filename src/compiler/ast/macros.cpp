@@ -424,30 +424,32 @@ std::optional<ty::type_id> macro_invocation::type_check(
     {
         if(!return_type.has_value())
         {
-            throw ty::type_error(
+            throw internal_error{
               index_expr->get_location(),
-              "Indexing into expression without type.");
+              "Indexing into expression without type."};
         }
 
         auto v = index_expr->type_check(ctx, env);
         if(!v.has_value())
         {
-            throw ty::type_error(
+            throw internal_error{
               index_expr->get_location(),
-              "Index expression has no type.");
+              "Index expression has no type."};
         }
         if(!ctx.are_types_compatible(ctx.get_i32_type(), v.value()))
         {
-            throw ty::type_error(
+            throw ty::type_error{
               loc,
               std::format(
                 "Expected <integer> for array element access, got '{}'.",
-                ctx.to_string(v.value())));
+                ctx.to_string(v.value()))};
         }
 
         if(!ctx.is_array(return_type.value()))
         {
-            throw ty::type_error(loc, "Cannot use subscript on non-array type.");
+            throw ty::type_error{
+              loc,
+              "Cannot use subscript on non-array type."};
         }
 
         expr_type = ctx.array_element_type(return_type.value());
@@ -705,11 +707,11 @@ std::optional<ty::type_id> macro_expression::type_check(
             namespace_path = e.get_namespace_path();
             if(!namespace_path.has_value())
             {
-                throw ty::type_error(
+                throw internal_error{
                   loc,
                   std::format(
                     "Unable to get namespace in macro expansion at {}.",
-                    ::slang::to_string(e.get_location())));
+                    ::slang::to_string(e.get_location()))};
             }
 
             auto module_id = env.get_symbol_id(
@@ -718,11 +720,11 @@ std::optional<ty::type_id> macro_expression::type_check(
               env.global_scope_id);
             if(!module_id.has_value())
             {
-                throw ty::type_error(
+                throw internal_error{
                   loc,
                   std::format(
                     "Unresolved import '{}',",
-                    namespace_path.value()));
+                    namespace_path.value())};
             }
 
             if(!env.transitive_imports.contains(module_id.value()))
@@ -739,11 +741,11 @@ std::optional<ty::type_id> macro_expression::type_check(
                      scope_id.value())
                   .has_value())
             {
-                throw ty::type_error(
+                throw internal_error{
                   e.get_location(),
                   std::format(
                     "Unresolved symbol '{}'.",
-                    e.as_call_expression()->get_qualified_callee_name()));
+                    e.as_call_expression()->get_qualified_callee_name())};
             }
         }
         else if(e.is_macro_invocation())
@@ -754,11 +756,11 @@ std::optional<ty::type_id> macro_expression::type_check(
                      scope_id.value())
                   .has_value())
             {
-                throw ty::type_error(
+                throw internal_error{
                   loc,
                   std::format(
                     "Unresolved symbol '{}',",
-                    e.as_macro_invocation()->get_qualified_name()));
+                    e.as_macro_invocation()->get_qualified_name())};
             }
         }
     };

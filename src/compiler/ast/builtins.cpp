@@ -112,25 +112,25 @@ std::optional<ty::type_id> format_macro_expression::type_check(
 
     if(exprs.empty())
     {
-        throw ty::type_error(
+        throw ty::type_error{
           loc,
-          "Macro 'format!': No format string found.");
+          "Macro 'format!': No format string found."};
     }
 
     if(!exprs[0]->is_literal())
     {
-        throw ty::type_error(
+        throw ty::type_error{
           exprs[0]->get_location(),
-          "Expected <string-literal>.");
+          "Expected <string-literal>."};
     }
 
     auto* format_expr = exprs[0]->as_literal();
     const auto& format_token = format_expr->get_token();
     if(format_token.type != token_type::str_literal)
     {
-        throw ty::type_error(
+        throw ty::type_error{
           format_token.location,
-          "Expected <string-literal>.");
+          "Expected <string-literal>."};
     }
 
     if(exprs[0]->type_check(ctx, env) != ctx.get_str_type())
@@ -151,12 +151,12 @@ std::optional<ty::type_id> format_macro_expression::type_check(
       loc.advance(1));
     if(placeholders.size() != exprs.size() - 1)
     {
-        throw ty::type_error(
+        throw ty::type_error{
           loc,
           std::format(
             "Macro 'format!': Argument count does not match placeholder count: {} != {}.",
             exprs.size() - 1,
-            placeholders.size()));
+            placeholders.size())};
     }
 
     for(std::size_t i = 1; i < exprs.size(); ++i)
@@ -168,11 +168,11 @@ std::optional<ty::type_id> format_macro_expression::type_check(
         if(!t.has_value())
         {
             // TODO likely needs different error handling (e.g., just return?)
-            throw ty::type_error(
+            throw ty::type_error{
               e->get_location(),
               std::format(
                 "Macro 'format!': Argument at position '{}' has no type.",
-                i));
+                i)};
         }
 
         format_util::validate_arg_type(

@@ -170,12 +170,12 @@ std::optional<const_::const_info> type_cast_expression::evaluate(
               .value = static_cast<double>(std::get<std::int64_t>(v->value))};
         }
 
-        throw ty::type_error(
+        throw ty::type_error{
           loc,
           std::format(
             "Invalid compile-time evaluated cast '{}' -> '{}'.",
             const_::to_string(v->type),
-            type_ctx.to_string(target_type->get_type())));
+            type_ctx.to_string(target_type->get_type()))};
     }
 
     if(v->type == const_::constant_type::i64)
@@ -228,12 +228,12 @@ std::optional<const_::const_info> type_cast_expression::evaluate(
               .value = static_cast<double>(std::get<std::int64_t>(v->value))};
         }
 
-        throw ty::type_error(
+        throw ty::type_error{
           loc,
           std::format(
             "Invalid compile-time evaluated cast '{}' -> '{}'.",
             const_::to_string(v->type),
-            type_ctx.to_string(target_type->get_type())));
+            type_ctx.to_string(target_type->get_type()))};
     }
 
     if(v->type == const_::constant_type::f32)
@@ -290,12 +290,12 @@ std::optional<const_::const_info> type_cast_expression::evaluate(
               .value = std::get<double>(v->value)};
         }
 
-        throw ty::type_error(
+        throw ty::type_error{
           loc,
           std::format(
             "Invalid compile-time evaluated cast '{}' -> '{}'.",
             const_::to_string(v->type),
-            type_ctx.to_string(target_type->get_type())));
+            type_ctx.to_string(target_type->get_type()))};
     }
 
     if(v->type == const_::constant_type::f64)
@@ -350,12 +350,12 @@ std::optional<const_::const_info> type_cast_expression::evaluate(
             return *v;
         }
 
-        throw ty::type_error(
+        throw ty::type_error{
           loc,
           std::format(
             "Invalid compile-time evaluated cast '{}' -> '{}'.",
             const_::to_string(v->type),
-            type_ctx.to_string(target_type->get_type())));
+            type_ctx.to_string(target_type->get_type()))};
     }
 
     return std::nullopt;
@@ -380,11 +380,11 @@ bool variable_reference_expression::is_const_eval(const_::env& env) const
 {
     if(!symbol_id.has_value())
     {
-        throw ty::type_error(
+        throw internal_error{
           loc,
           std::format(
             "Reference '{}' has no symbol id.",
-            name.s));
+            name.s)};
     }
 
     // check whether we're referencing a constant.
@@ -397,11 +397,11 @@ std::optional<const_::const_info> variable_reference_expression::evaluate(
 {
     if(!symbol_id.has_value())
     {
-        throw ty::type_error(
+        throw internal_error{
           loc,
           std::format(
             "Reference '{}' has no symbol id.",
-            name.s));
+            name.s)};
     }
 
     return env.get_const_info(symbol_id.value());

@@ -134,13 +134,13 @@ type_id context::declare_struct(
       });
     if(it != type_info_map.end())
     {
-        throw type_error(
+        throw internal_error{
           std::format(
             "Struct '{}' {} already defined.",
             name,
             qualified_name.has_value()
               ? std::format("({})", qualified_name.value())
-              : std::string{}));
+              : std::string{})};
     }
 
     std::size_t id = generate_type_id();
@@ -166,37 +166,37 @@ std::size_t context::add_field(
     auto it = type_info_map.find(struct_type_id);
     if(it == type_info_map.end())
     {
-        throw type_error(
+        throw internal_error{
           std::format(
             "No type with id '{}' found.",
-            struct_type_id));
+            struct_type_id)};
     }
 
     if(it->second.kind != type_kind::struct_)
     {
-        throw type_error(
+        throw internal_error{
           std::format(
             "Cannot add field to non-struct type '{}'.",
-            to_string(it->first)));
+            to_string(it->first))};
     }
 
     auto& info = std::get<struct_info>(it->second.data);
     if(info.is_sealed)
     {
-        throw type_error(
+        throw internal_error{
           std::format(
             "Cannot add field '{}' to struct '{}': Struct is sealed.",
             field_name,
-            info.name));
+            info.name)};
     }
 
     if(info.fields_by_name.contains(field_name))
     {
-        throw type_error(
+        throw internal_error{
           std::format(
             "Cannot add field '{}' to struct '{}': Field already exists.",
             field_name,
-            info.name));
+            info.name)};
     }
 
     std::size_t field_index = info.fields.size();
@@ -214,18 +214,18 @@ void context::seal_struct(type_id struct_type_id)
     auto it = type_info_map.find(struct_type_id);
     if(it == type_info_map.end())
     {
-        throw type_error(
+        throw internal_error{
           std::format(
             "No type with id '{}' found.",
-            struct_type_id));
+            struct_type_id)};
     }
 
     if(it->second.kind != type_kind::struct_)
     {
-        throw type_error(
+        throw internal_error{
           std::format(
             "Cannot seal non-struct type '{}'.",
-            to_string(it->first)));
+            to_string(it->first))};
     }
 
     auto& info = std::get<struct_info>(it->second.data);
@@ -454,18 +454,18 @@ void context::set_type_flags(
     auto it = type_info_map.find(id);
     if(it == type_info_map.end())
     {
-        throw type_error(
+        throw internal_error{
           std::format(
             "Type with id '{}' not found.",
-            id));
+            id)};
     }
 
     if(it->second.kind != type_kind::struct_)
     {
-        throw type_error(
+        throw internal_error{
           std::format(
             "Cannot get flags for non-struct type '{}'.",
-            to_string(id)));
+            to_string(id))};
     }
 
     if(native.has_value())
@@ -539,7 +539,7 @@ void context::set_expression_type_or_throw(
     if(!set_expression_type(expr, id))
     {
         const auto& prev = expression_types[&expr];
-        throw type_error(
+        throw internal_error{
           expr.get_location(),
           std::format(
             "Could not set type: Expression type differs from last evaluation ('{}' != '{}').",
@@ -548,7 +548,7 @@ void context::set_expression_type_or_throw(
               : std::string{"<none>"},
             id.has_value()
               ? to_string(id.value())
-              : std::string{"<none>"}));
+              : std::string{"<none>"})};
     }
 }
 
