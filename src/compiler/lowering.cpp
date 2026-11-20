@@ -49,10 +49,10 @@ const cg::type& context::lower(ty::type_id id)
     auto [insert_it, success] = type_cache.insert({id, cg::type{id, cg::type_kind::ref}});
     if(!success)
     {
-        throw internal_error(
+        throw internal_error{
           std::format(
             "Could not cache type for lowering: {}",
-            type_ctx.to_string(id)));
+            type_ctx.to_string(id))};
     }
 
     return insert_it->second;
@@ -67,19 +67,19 @@ cg::type context::deref(const cg::type& type)
 {
     if(!type.get_type_id().has_value())
     {
-        throw internal_error(
+        throw internal_error{
           std::format(
             "Could not deref type: Front-end type not set (back-end type is '{}')",
-            cg::to_string(type.get_type_kind())));
+            cg::to_string(type.get_type_kind()))};
     }
 
     if(!type_ctx.is_array(type.get_type_id().value()))
     {
         // Type-check has established we're dereferencing an array type.
-        throw internal_error(
+        throw internal_error{
           std::format(
             "Could not deref non-array type '{}'.",
-            type_ctx.to_string(type.get_type_id().value())));
+            type_ctx.to_string(type.get_type_id().value()))};
     }
 
     return lower(
@@ -97,8 +97,8 @@ type_class context::get_type_class(const cg::type& type) const
     switch(tk)
     {
     case cg::type_kind::void_:
-        throw internal_error(
-          "Type 'void' has no stack value.");
+        throw internal_error{
+          "Type 'void' has no stack value."};
     case cg::type_kind::i8:
     case cg::type_kind::i16:
     case cg::type_kind::i32:

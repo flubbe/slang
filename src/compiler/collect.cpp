@@ -283,17 +283,16 @@ void context::push_scope(sema::scope_id id)
 {
     if(id == sema::scope::invalid_id)
     {
-        throw internal_error(
-          std::format(
-            "Cannot enter invalid scope."));
+        throw internal_error{
+          "Cannot enter invalid scope."};
     }
 
     if(!has_scope(env, id))
     {
-        throw internal_error(
+        throw internal_error{
           std::format(
             "Cannot enter unknown scope '{}'.",
-            id));
+            id)};
     }
 
     current_scope = id;

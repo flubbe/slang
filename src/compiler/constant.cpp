@@ -102,7 +102,7 @@ constant_id env::intern(std::int32_t i)
     if(const_literal_map.size() == std::numeric_limits<std::size_t>::max())
     {
         // should never happen.
-        throw slang::internal_error{
+        throw internal_error{
           std::format(
             "Too many constants in constant environment (>= std::numeric_limits<std::size_t>::max() = {})",
             std::numeric_limits<std::size_t>::max())};
@@ -136,7 +136,7 @@ constant_id env::intern(std::int64_t i)
     if(const_literal_map.size() == std::numeric_limits<std::size_t>::max())
     {
         // should never happen.
-        throw slang::internal_error{
+        throw internal_error{
           std::format(
             "Too many constants in constant environment (>= std::numeric_limits<std::size_t>::max() = {})",
             std::numeric_limits<std::size_t>::max())};
@@ -170,7 +170,7 @@ constant_id env::intern(float f)
     if(const_literal_map.size() == std::numeric_limits<std::size_t>::max())
     {
         // should never happen.
-        throw slang::internal_error{
+        throw internal_error{
           std::format(
             "Too many constants in constant environment (>= std::numeric_limits<std::size_t>::max() = {})",
             std::numeric_limits<std::size_t>::max())};
@@ -204,7 +204,7 @@ constant_id env::intern(double d)
     if(const_literal_map.size() == std::numeric_limits<std::size_t>::max())
     {
         // should never happen.
-        throw slang::internal_error{
+        throw internal_error{
           std::format(
             "Too many constants in constant environment (>= std::numeric_limits<std::size_t>::max() = {})",
             std::numeric_limits<std::size_t>::max())};
@@ -238,7 +238,7 @@ constant_id env::intern(std::string s)
     if(const_literal_map.size() == std::numeric_limits<std::size_t>::max())
     {
         // should never happen.
-        throw slang::internal_error{
+        throw internal_error{
           std::format(
             "Too many constants in constant environment (>= std::numeric_limits<std::size_t>::max() = {})",
             std::numeric_limits<std::size_t>::max())};

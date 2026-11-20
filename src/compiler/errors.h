@@ -92,6 +92,27 @@ struct source_error : public std::runtime_error
 struct internal_error : public std::runtime_error
 {
     using std::runtime_error::runtime_error;
+
+    /** Source location where the error occurred, if available. */
+    std::optional<source_location> location{};
+
+    /**
+     * Construct with a location and message.
+     *
+     * @param loc The location the error refers to.
+     * @param m The human-readable message (without a location prefix).
+     */
+    internal_error(
+      source_location loc,
+      const std::string& m)
+    : std::runtime_error{
+        std::format(
+          "{}: {}",
+          to_string(loc),
+          m)}
+    , location{loc}
+    {
+    }
 };
 
 }    // namespace slang

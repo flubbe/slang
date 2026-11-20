@@ -257,20 +257,18 @@ void expression::generate_code(
 std::unique_ptr<cg::lvalue> expression::emit_lvalue(
   [[maybe_unused]] cg::context& ctx) const
 {
-    throw internal_error(
-      std::format(
-        "{}: Expression cannot be used as an l-value.",
-        slang::to_string(loc)));
+    throw internal_error{
+      loc,
+      "Expression cannot be used as an l-value."};
 }
 
 std::unique_ptr<cg::rvalue> expression::emit_rvalue(
   [[maybe_unused]] cg::context& ctx,
   [[maybe_unused]] bool result_used) const
 {
-    throw internal_error(
-      std::format(
-        "{}: Expression cannot be used as an r-value.",
-        slang::to_string(loc)));
+    throw internal_error{
+      loc,
+      "Expression cannot be used as an r-value."};
 }
 
 void expression::collect_attributes(sema::env& env) const
@@ -650,17 +648,15 @@ std::unique_ptr<cg::rvalue> literal_expression::emit_rvalue(
     if(!tok.value.has_value())
     {
         throw internal_error{
-          std::format(
-            "{}: Empty literal.",
-            slang::to_string(loc))};
+          loc,
+          "Empty literal."};
     }
 
     if(!expr_type.has_value())
     {
         throw internal_error{
-          std::format(
-            "{}: Literal expression has no type.",
-            slang::to_string(loc))};
+          loc,
+          "Literal expression has no type."};
     }
 
     auto lowered_type = ctx.lower(expr_type.value());
@@ -712,9 +708,9 @@ std::unique_ptr<cg::rvalue> literal_expression::emit_rvalue(
         }
 
         throw internal_error{
+          loc,
           std::format(
-            "{}: Unable to generate code for literal of unexpected type kind '{}' (type id {}) during code generation.",
-            slang::to_string(loc),
+            "Unable to generate code for literal of unexpected type kind '{}' (type id {}) during code generation.",
             cg::to_string(lowered_type.get_type_kind()),
             lowered_type.get_type_id().value_or(-1))};
     }();
@@ -733,7 +729,7 @@ std::optional<ty::type_id> literal_expression::type_check(
 {
     if(!tok.value)
     {
-        throw ty::type_error(loc, "Empty literal.");
+        throw internal_error{loc, "Empty literal."};
     }
 
     // default to i32 for integer literals and f64 for floating-point literals.
@@ -973,9 +969,9 @@ std::unique_ptr<cg::rvalue> type_cast_expression::emit_rvalue(
     const auto throw_invalid_cast = [this, &v, &lowered_type]() -> void
     {
         throw internal_error{
+          loc,
           std::format(
-            "{}: Invalid cast from {} to {}.",
-            slang::to_string(loc),
+            "Invalid cast from {} to {}.",
             v->get_type().to_string(),
             lowered_type.to_string())};
     };
@@ -1411,23 +1407,20 @@ std::unique_ptr<cg::lvalue> access_expression::emit_lvalue(
     if(!expr_type.has_value())
     {
         throw internal_error{
-          std::format(
-            "{}: Access expression has no type.",
-            slang::to_string(loc))};
+          loc,
+          "Access expression has no type."};
     }
     if(!rhs)
     {
         throw internal_error{
-          std::format(
-            "{}: Access expression has no r.h.s.",
-            slang::to_string(loc))};
+          loc,
+          "Access expression has no r.h.s."};
     }
     if(!struct_type.has_value())
     {
         throw internal_error{
-          std::format(
-            "{}: Access expression has no struct type.",
-            slang::to_string(loc))};
+          loc,
+          "Access expression has no struct type."};
     }
 
     // load l.h.s. for access.
@@ -1444,9 +1437,8 @@ std::unique_ptr<cg::lvalue> access_expression::emit_lvalue(
         if(!rhs->is_named_expression())
         {
             throw internal_error{
-              std::format(
-                "{}: Could not find name for element access in array access expression.",
-                slang::to_string(loc))};
+              loc,
+              "Could not find name for element access in array access expression."};
         }
         auto* identifier_expr = rhs->as_named_expression();
 
@@ -1454,16 +1446,15 @@ std::unique_ptr<cg::lvalue> access_expression::emit_lvalue(
         if(identifier_expr->get_name() == "length")
         {
             throw internal_error{
-              std::format(
-                "{}: Array length is read only.",
-                slang::to_string(rhs->get_location()))};
+              rhs->get_location(),
+              "Array length is read only."};
         }
 
         // TODO This should be caught be semantic analysis.
         throw internal_error{
+          rhs->get_location(),
           std::format(
-            "{}: Unknown array property '{}'.",
-            slang::to_string(rhs->get_location()),
+            "Unknown array property '{}'.",
             identifier_expr->get_name())};
     }
 
@@ -1492,16 +1483,14 @@ std::unique_ptr<cg::rvalue> access_expression::emit_rvalue(
     if(!expr_type.has_value())
     {
         throw internal_error{
-          std::format(
-            "{}: Access expression has no type.",
-            slang::to_string(loc))};
+          loc,
+          "Access expression has no type."};
     }
     if(!rhs)
     {
         throw internal_error{
-          std::format(
-            "{}: Access expression has no r.h.s.",
-            slang::to_string(loc))};
+          loc,
+          "Access expression has no r.h.s."};
     }
 
     auto lhs_value = lhs->emit_rvalue(ctx, true);
@@ -1515,9 +1504,8 @@ std::unique_ptr<cg::rvalue> access_expression::emit_rvalue(
         if(!rhs->is_named_expression())
         {
             throw internal_error{
-              std::format(
-                "{}: Could not find name for element access in array access expression.",
-                slang::to_string(loc))};
+              loc,
+              "Could not find name for element access in array access expression."};
         }
         auto* identifier_expr = rhs->as_named_expression();
 
@@ -1529,9 +1517,9 @@ std::unique_ptr<cg::rvalue> access_expression::emit_rvalue(
         }
 
         throw internal_error{
+          identifier_expr->get_location(),
           std::format(
-            "{}: Unknown array property '{}'.",
-            slang::to_string(identifier_expr->get_location()),
+            "Unknown array property '{}'.",
             identifier_expr->get_name())};
     }
 
@@ -1542,18 +1530,16 @@ std::unique_ptr<cg::rvalue> access_expression::emit_rvalue(
     if(!struct_type.has_value())
     {
         throw internal_error{
-          std::format(
-            "{}: Access expression has no struct type.",
-            slang::to_string(loc))};
+          loc,
+          "Access expression has no struct type."};
     }
 
     // generate access instructions for rhs.
     if(!rhs->is_named_expression())
     {
         throw internal_error{
-          std::format(
-            "{}: Expected a named expression for struct member access.",
-            slang::to_string(rhs->get_location()))};
+          rhs->get_location(),
+          "Expected a named expression for struct member access."};
     }
     auto type = cg::type{struct_type.value(), cg::type_kind::ref};
 
@@ -1967,18 +1953,18 @@ std::unique_ptr<cg::lvalue> variable_reference_expression::emit_lvalue(
     if(!symbol_id.has_value())
     {
         throw internal_error{
+          loc,
           std::format(
-            "{}: Reference '{}' has no symbol id.",
-            slang::to_string(loc),
+            "Reference '{}' has no symbol id.",
             name.s)};
     }
 
     if(!expr_type.has_value())
     {
         throw internal_error{
+          loc,
           std::format(
-            "{}: Reference '{}' has no type.",
-            slang::to_string(loc),
+            "Reference '{}' has no type.",
             name.s)};
     }
 
@@ -1993,9 +1979,9 @@ std::unique_ptr<cg::lvalue> variable_reference_expression::emit_lvalue(
     if(it == sema_env.symbol_table.cend())
     {
         throw internal_error{
+          loc,
           std::format(
-            "{}: {}: Reference not found in symbol table (symbol id: {}).",
-            slang::to_string(loc),
+            "{}: Reference not found in symbol table (symbol id: {}).",
             get_name(),
             symbol_id.value().value)};
     }
@@ -2007,9 +1993,9 @@ std::unique_ptr<cg::lvalue> variable_reference_expression::emit_lvalue(
     case sema::symbol_type::constant:
     {
         throw internal_error{
+          loc,
           std::format(
-            "{}: Cannot assign to constant '{}'.",
-            slang::to_string(loc),
+            "Cannot assign to constant '{}'.",
             info.name)};
     }
 
@@ -2030,9 +2016,9 @@ std::unique_ptr<cg::lvalue> variable_reference_expression::emit_lvalue(
     }
 
     throw internal_error{
+      loc,
       std::format(
-        "{}: Identifier '{}' is not a value.",
-        slang::to_string(loc),
+        "Identifier '{}' is not a value.",
         info.name)};
 }
 
@@ -2043,18 +2029,18 @@ std::unique_ptr<cg::rvalue> variable_reference_expression::emit_rvalue(
     if(!symbol_id.has_value())
     {
         throw internal_error{
+          loc,
           std::format(
-            "{}: Reference '{}' has no symbol id.",
-            slang::to_string(loc),
+            "Reference '{}' has no symbol id.",
             name.s)};
     }
 
     if(!expr_type.has_value())
     {
         throw internal_error{
+          loc,
           std::format(
-            "{}: Reference '{}' has no type.",
-            slang::to_string(loc),
+            "Reference '{}' has no type.",
             name.s)};
     }
 
@@ -2069,9 +2055,9 @@ std::unique_ptr<cg::rvalue> variable_reference_expression::emit_rvalue(
     if(it == sema_env.symbol_table.cend())
     {
         throw internal_error{
+          loc,
           std::format(
-            "{}: {}: Reference not found in symbol table (symbol id: {}).",
-            slang::to_string(loc),
+            "{}: Reference not found in symbol table (symbol id: {}).",
             get_name(),
             symbol_id.value().value)};
     }
@@ -2086,9 +2072,9 @@ std::unique_ptr<cg::rvalue> variable_reference_expression::emit_rvalue(
         if(!const_info.has_value())
         {
             throw internal_error{
+              loc,
               std::format(
-                "{}: Could not find constant info for '{}'.",
-                slang::to_string(loc),
+                "Could not find constant info for '{}'.",
                 info.name)};
         }
 
@@ -2146,9 +2132,9 @@ std::unique_ptr<cg::rvalue> variable_reference_expression::emit_rvalue(
 
         // unsupported type.
         throw internal_error{
+          loc,
           std::format(
-            "{}: Unsupported constant type '{}'.",
-            slang::to_string(loc),
+            "Unsupported constant type '{}'.",
             const_::to_string(const_info->type))};
     }
 
@@ -2170,9 +2156,9 @@ std::unique_ptr<cg::rvalue> variable_reference_expression::emit_rvalue(
     }
 
     throw internal_error{
+      loc,
       std::format(
-        "{}: Identifier '{}' is not a value.",
-        slang::to_string(loc),
+        "Identifier '{}' is not a value.",
         info.name)};
 }
 
@@ -2777,9 +2763,9 @@ std::unique_ptr<cg::rvalue> array_initializer_expression::emit_rvalue(
     if(exprs.size() >= std::numeric_limits<std::int32_t>::max())
     {
         throw internal_error{
+          exprs.front()->get_location(),
           std::format(
-            "{}: Cannot generate code for array initializer list: list size exceeds numeric limits ({} >= {}).",
-            slang::to_string(exprs.front()->get_location()),
+            "Cannot generate code for array initializer list: list size exceeds numeric limits ({} >= {}).",
             exprs.size(),
             std::numeric_limits<std::int32_t>::max())};
     }
@@ -3030,17 +3016,16 @@ std::unique_ptr<cg::rvalue> struct_anonymous_initializer_expression::emit_rvalue
     if(!expr_type.has_value())
     {
         throw internal_error{
-          std::format(
-            "{}: Anonymous struct initializer has no type.",
-            slang::to_string(loc))};
+          loc,
+          "Anonymous struct initializer has no type."};
     }
 
     if(initializers.size() != fields.size())
     {
         throw internal_error{
+          loc,
           std::format(
-            "{}: Inconsistent struct initialization: {} initializers, {} fields.",
-            slang::to_string(loc),
+            "Inconsistent struct initialization: {} initializers, {} fields.",
             initializers.size(),
             fields.size())};
     }
@@ -3062,9 +3047,9 @@ std::unique_ptr<cg::rvalue> struct_anonymous_initializer_expression::emit_rvalue
         {
             // NOTE Field name unresolved, because that would need the typing context.
             throw internal_error{
+              loc,
               std::format(
-                "{}: Code generation for '{}.{}' initialization returned no type.",
-                slang::to_string(loc),
+                "Code generation for '{}.{}' initialization returned no type.",
                 name.s,
                 field_info.field_index)};
         }
@@ -3075,9 +3060,9 @@ std::unique_ptr<cg::rvalue> struct_anonymous_initializer_expression::emit_rvalue
         {
             // NOTE Field name unresolved, because that would need the typing context.
             throw internal_error{
+              loc,
               std::format(
-                "{}: Code generation for '{}.{}' initialization returned '{}' (expected '{}').",
-                slang::to_string(loc),
+                "Code generation for '{}.{}' initialization returned '{}' (expected '{}').",
                 name.s,
                 field_info.field_index,
                 ::cg::to_string(initializer_value->get_type().get_type_kind()),
@@ -3261,17 +3246,16 @@ std::unique_ptr<cg::rvalue> struct_named_initializer_expression::emit_rvalue(
     if(!expr_type.has_value())
     {
         throw internal_error{
-          std::format(
-            "{}: Named struct initializer has no type.",
-            slang::to_string(loc))};
+          loc,
+          "Named struct initializer has no type."};
     }
 
     if(initializers.size() != fields.size())
     {
         throw internal_error{
+          loc,
           std::format(
-            "{}: Inconsistent struct initialization: {} initializers, {} fields.",
-            slang::to_string(loc),
+            "Inconsistent struct initialization: {} initializers, {} fields.",
             initializers.size(),
             fields.size())};
     }
@@ -3296,9 +3280,9 @@ std::unique_ptr<cg::rvalue> struct_named_initializer_expression::emit_rvalue(
         {
             // NOTE Field name unresolved, because that would need the typing context.
             throw internal_error{
+              loc,
               std::format(
-                "{}: Code generation for '{}.{}' initialization returned no type.",
-                slang::to_string(loc),
+                "Code generation for '{}.{}' initialization returned no type.",
                 name.s,
                 field_info.field_index)};
         }
@@ -3310,9 +3294,9 @@ std::unique_ptr<cg::rvalue> struct_named_initializer_expression::emit_rvalue(
         {
             // NOTE Field name unresolved, because that would need the typing context.
             throw internal_error{
+              loc,
               std::format(
-                "{}: Code generation for '{}.{}' initialization returned '{}' (expected '{}').",
-                slang::to_string(loc),
+                "Code generation for '{}.{}' initialization returned '{}' (expected '{}').",
                 name.s,
                 field_info.field_index,
                 ::cg::to_string(initializer_value->get_type().get_type_kind()),
@@ -3962,9 +3946,9 @@ static std::optional<std::int64_t> get_const_i32(
     if(info.type != const_::constant_type::i32)
     {
         throw internal_error{
+          expr.get_location(),
           std::format(
-            "{}: Expected constant expression to be of type 'i32', got '{}'.",
-            slang::to_string(expr.get_location()),
+            "Expected constant expression to be of type 'i32', got '{}'.",
             const_::to_string(info.type))};
     }
 
@@ -4542,9 +4526,9 @@ static void emit_addsub_one(
     else
     {
         throw internal_error{
+          loc,
           std::format(
-            "{}: Wrong expression type '{}' for prefix operator '++'. Expected 'i32', 'i64', 'f32' or 'f64'.",
-            slang::to_string(loc),
+            "Wrong expression type '{}' for prefix operator '++'. Expected 'i32', 'i64', 'f32' or 'f64'.",
             ty.to_string())};
     }
 
@@ -4657,9 +4641,9 @@ std::unique_ptr<cg::rvalue> unary_expression::emit_rvalue(
         else
         {
             throw internal_error{
+              loc,
               std::format(
-                "{}: Type error for unary operator '-': Expected 'i8', 'i16', 'i32', 'i64', 'f32' or 'f64', got '{}'.",
-                slang::to_string(loc),
+                "Type error for unary operator '-': Expected 'i8', 'i16', 'i32', 'i64', 'f32' or 'f64', got '{}'.",
                 v->get_type().to_string())};
         }
 
@@ -4673,9 +4657,9 @@ std::unique_ptr<cg::rvalue> unary_expression::emit_rvalue(
            && v->get_type().get_type_kind() != cg::type_kind::i64)
         {
             throw internal_error{
+              loc,
               std::format(
-                "{}: Type error for unary operator '!': Expected 'i32' or 'i64', got '{}'.",
-                slang::to_string(loc),
+                "Type error for unary operator '!': Expected 'i32' or 'i64', got '{}'.",
                 v->get_type().to_string())};
         }
 
@@ -4706,9 +4690,9 @@ std::unique_ptr<cg::rvalue> unary_expression::emit_rvalue(
             }
 
             throw internal_error{
+              loc,
               std::format(
-                "{}: Type error for unary operator '~': Expected 'i8', 'i16', 'i32' or 'i64', got '{}'.",
-                slang::to_string(loc),
+                "Type error for unary operator '~': Expected 'i8', 'i16', 'i32' or 'i64', got '{}'.",
                 v->get_type().to_string())};
         }();
 
@@ -4841,9 +4825,8 @@ std::unique_ptr<cg::rvalue> new_expression::emit_rvalue(
     if(element_type.get_type_kind() == cg::type_kind::void_)
     {
         throw internal_error{
-          std::format(
-            "{}: Cannot create array with elements of type 'void'.",
-            slang::to_string(loc))};
+          loc,
+          "Cannot create array with elements of type 'void'."};
     }
 
     // generate array size.
@@ -4851,9 +4834,9 @@ std::unique_ptr<cg::rvalue> new_expression::emit_rvalue(
     if(v->get_type().get_type_kind() != cg::type_kind::i32)
     {
         throw internal_error{
+          loc,
           std::format(
-            "{}: Expected <integer> as array size, got '{}'.",
-            slang::to_string(loc),
+            "Expected <integer> as array size, got '{}'.",
             v->get_type().to_string())};
     }
 
@@ -5070,9 +5053,9 @@ std::unique_ptr<cg::rvalue> postfix_expression::emit_rvalue(
         else
         {
             throw internal_error{
+              op.location,
               std::format(
-                "{}: Unknown variable type for postfix operator '{}'.",
-                slang::to_string(op.location),
+                "Unknown variable type for postfix operator '{}'.",
                 op.s)};
         }
 
@@ -5090,9 +5073,9 @@ std::unique_ptr<cg::rvalue> postfix_expression::emit_rvalue(
     else
     {
         throw internal_error{
+          op.location,
           std::format(
-            "{}: Unknown postfix operator '{}'.",
-            slang::to_string(op.location),
+            "Unknown postfix operator '{}'.",
             op.s)};
     }
 
@@ -5452,9 +5435,9 @@ void function_expression::generate_code(
     if(!symbol_id.has_value())
     {
         throw internal_error{
+          loc,
           std::format(
-            "{}: Function '{}' has no symbol id.",
-            slang::to_string(loc),
+            "Function '{}' has no symbol id.",
             prototype->get_name())};
     }
 
@@ -5495,9 +5478,9 @@ void function_expression::generate_code(
         if(!body)
         {
             throw internal_error{
+              loc,
               std::format(
-                "{}: No function body defined for '{}'.",
-                slang::to_string(loc),
+                "No function body defined for '{}'.",
                 prototype->get_name())};
         }
 
@@ -5507,9 +5490,8 @@ void function_expression::generate_code(
         if(ctx.get_break_continue_stack_size() != 0)
         {
             throw internal_error{
-              std::format(
-                "{}: Internal error: Break-continue stack is not empty.",
-                slang::to_string(loc))};
+              loc,
+              "Internal error: Break-continue stack is not empty."};
         }
 
         auto* ip = ctx.get_insertion_point();
@@ -5710,9 +5692,9 @@ std::unique_ptr<cg::rvalue> call_expression::emit_rvalue(
     if(!symbol_id.has_value())
     {
         throw internal_error{
+          loc,
           std::format(
-            "{}: Callee '{}' has no symbol id.",
-            slang::to_string(loc),
+            "Callee '{}' has no symbol id.",
             callee.s)};
     }
 
@@ -5766,9 +5748,9 @@ std::optional<ty::type_id> call_expression::type_check(
     if(!symbol_id.has_value())
     {
         throw internal_error{
+          loc,
           std::format(
-            "{}: Function '{}' has no symbol id.",
-            slang::to_string(loc),
+            "Function '{}' has no symbol id.",
             callee.s)};
     }
 
@@ -5783,9 +5765,9 @@ std::optional<ty::type_id> call_expression::type_check(
     if(!callee_symbol_info.reference.has_value())
     {
         throw internal_error{
+          loc,
           std::format(
-            "{}: Function '{}' has no reference.",
-            slang::to_string(loc),
+            "Function '{}' has no reference.",
             callee.s)};
     }
 
@@ -6172,9 +6154,9 @@ void if_statement::generate_code(
     if(condition_v->get_type().get_type_kind() != cg::type_kind::i32)
     {
         throw internal_error{
+          loc,
           std::format(
-            "{}: Expected if condition to be of type 'i32', got '{}.'",
-            slang::to_string(loc),
+            "Expected if condition to be of type 'i32', got '{}.'",
             condition_v->get_type().to_string())};
     }
 
@@ -6363,9 +6345,9 @@ void while_statement::generate_code(
     if(v->get_type().get_type_kind() != cg::type_kind::i32)
     {
         throw internal_error{
+          loc,
           std::format(
-            "{}: Expected while condition to be of type 'i32', got '{}'.",
-            slang::to_string(loc),
+            "Expected while condition to be of type 'i32', got '{}'.",
             v->get_type().to_string())};
     }
 

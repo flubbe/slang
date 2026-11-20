@@ -771,7 +771,7 @@ void context::resolve_imports(
 
                 if(!opt_id.has_value())
                 {
-                    throw slang::internal_error{
+                    throw internal_error{
                       std::format(
                         "No symbol id for non-transitive module '{}'.",
                         qualified_module_name)};
@@ -793,12 +793,12 @@ void context::resolve_imports(
            spec});
         if(!success)
         {
-            throw slang::internal_error{
+            throw internal_error{
+              entry->second.location,
               std::format(
-                "{}: Module '{}' was already resolved at {}.",
-                ::slang::to_string(entry->second.location),
+                "Module '{}' was already resolved at {}.",
                 qualified_module_name,
-                ::slang::to_string(spec.location))};
+                slang::to_string(spec.location))};
         }
 
         module_graph[qualified_module_name] = {};
@@ -855,7 +855,8 @@ void context::resolve_imports(
         // set up global scope.
         if(import_collector.push_scope("<global>", {0, 0}) != co::context::global_scope_id)
         {
-            throw slang::internal_error("Got unexpected scope id for global scope.");
+            throw internal_error{
+              "Got unexpected scope id for global scope."};
         }
 
         const auto& header = resolver->get_module().get_header();
@@ -878,10 +879,10 @@ void context::resolve_imports(
             auto resolved_it = resolved_import_specs.find(qualified_module_name);
             if(resolved_it == resolved_import_specs.end())
             {
-                throw slang::internal_error(
+                throw internal_error{
                   std::format(
                     "No source location for imported module {}.",
-                    qualified_module_name));
+                    qualified_module_name)};
             }
 
             // import symbols.
