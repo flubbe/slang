@@ -182,7 +182,7 @@ std::optional<std::string> find_closest_match(
 
 /**
  * Diagnostics context. Manages source files, collects diagnostics,
- * formats them with Rust-style source snippets, and tracks error counts.
+ * formats them with source snippets, and tracks error counts.
  */
 class context
 {
@@ -259,7 +259,7 @@ public:
     /** Clear all diagnostics. */
     void clear();
 
-    /** Format a single diagnostic to a Rust-style string. */
+    /** Format a single diagnostic. */
     std::string format(
       const diagnostic& diag) const;
 

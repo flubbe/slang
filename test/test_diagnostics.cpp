@@ -61,10 +61,10 @@ TEST(diagnostics, file_line_lookup)
     EXPECT_EQ(ctx.get_line(filename, 5), std::nullopt);
 }
 
-TEST(diagnostics, format_rust_style)
+TEST(diagnostics, format_style)
 {
     diag::context ctx;
-    const std::string filename = "example.slang";
+    const std::string filename = "example.sl";
     const std::string content =
       "fn test() -> i32\n"
       "{\n"
@@ -94,7 +94,7 @@ TEST(diagnostics, format_rust_style)
 
     const std::string expected =
       "error[E0123]: unknown variable `foo`\n"
-      "  --> example.slang:4:11\n"
+      "  --> example.sl:4:11\n"
       "   |\n"
       " 4 |     bar = foo + 1;\n"
       "   |           ^^^ unknown variable\n"

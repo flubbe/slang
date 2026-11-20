@@ -39,19 +39,19 @@ void context::import_constant(
     auto symbol_info_it = sema_env.symbol_table.find(symbol_id);
     if(symbol_info_it == sema_env.symbol_table.end())
     {
-        throw std::runtime_error(
+        throw internal_error{
           std::format(
             "No symbol info registered in symbol table for id '{}'.",
-            symbol_id.value));
+            symbol_id.value)};
     }
 
     const auto& const_idx = std::get<std::size_t>(symbol.desc);
     if(const_idx >= header.constants.size())
     {
-        throw std::runtime_error(
+        throw internal_error{
           std::format(
             "External symbol '{}': Constant table index out of range.",
-            symbol_info_it->second.qualified_name));
+            symbol_info_it->second.qualified_name)};
     }
 
     // bounds are checked above.
@@ -127,11 +127,11 @@ void context::import_constant(
             return type_ctx.get_str_type();
         }
 
-        throw std::runtime_error(
+        throw internal_error{
           std::format(
             "External symbol '{}': Unknown constant type {}.",
             symbol_info_it->second.qualified_name,
-            std::to_underlying(const_entry.type)));
+            std::to_underlying(const_entry.type))};
     }();
 
     auto [entry, success] = sema_env.type_map.insert(
@@ -139,10 +139,10 @@ void context::import_constant(
        new_type_id});
     if(!success)
     {
-        throw std::runtime_error(
+        throw internal_error{
           std::format(
             "Could not insert symbol '{}' into type map.",
-            symbol_info_it->second.qualified_name));
+            symbol_info_it->second.qualified_name)};
     }
 }
 
@@ -156,10 +156,10 @@ void context::import_function(
     auto symbol_info_it = sema_env.symbol_table.find(symbol_id);
     if(symbol_info_it == sema_env.symbol_table.end())
     {
-        throw std::runtime_error(
+        throw internal_error{
           std::format(
             "No symbol info registered in symbol table for id '{}'.",
-            symbol_id.value));
+            symbol_id.value)};
     }
 
     // TODO Only verify and load types?
@@ -186,10 +186,10 @@ void context::import_macro(
     auto symbol_info_it = sema_env.symbol_table.find(symbol_id);
     if(symbol_info_it == sema_env.symbol_table.end())
     {
-        throw std::runtime_error(
+        throw internal_error{
           std::format(
             "No symbol info registered in symbol table for id '{}'.",
-            symbol_id.value));
+            symbol_id.value)};
     }
 
     /*
@@ -322,17 +322,17 @@ std::optional<sema::symbol_id> context::resolve_external(
     auto declaring_module_it = sema_env.symbol_table.find(info.declaring_module);
     if(declaring_module_it == sema_env.symbol_table.cend())
     {
-        throw std::runtime_error(
+        throw internal_error{
           std::format(
             "Cannot insert symbol '{}' into global scope: Declaring module not found in symbol table.",
-            info.qualified_name));
+            info.qualified_name)};
     }
     if(declaring_module_it->second.type != sema::symbol_type::module_)
     {
-        throw std::runtime_error(
+        throw internal_error{
           std::format(
             "Cannot insert symbol '{}' into global scope: Symbol does not reference a declaring module.",
-            info.qualified_name));
+            info.qualified_name)};
     }
 
     auto declaring_module_symbol_id = [this, &info, &declaring_module_it] -> sema::symbol_id
@@ -359,10 +359,10 @@ std::optional<sema::symbol_id> context::resolve_external(
            }});
         if(!success)
         {
-            throw std::runtime_error(
+            throw internal_error{
               std::format(
                 "Could not insert symbol '{}' into global namespace.",
-                info.qualified_name));
+                info.qualified_name)};
         }
 
         return declaring_module_symbol_id;
@@ -374,10 +374,10 @@ std::optional<sema::symbol_id> context::resolve_external(
     auto global_scope_it = sema_env.scope_map.find(sema_env.global_scope_id);
     if(global_scope_it == sema_env.scope_map.end())
     {
-        throw std::runtime_error(
+        throw internal_error{
           std::format(
             "Cannot insert symbol '{}' into global scope: Scope not found.",
-            info.qualified_name));
+            info.qualified_name)};
     }
 
     global_scope_it->second.bindings.insert(
@@ -403,18 +403,18 @@ std::optional<sema::symbol_id> context::resolve_external(
        }});
     if(!success)
     {
-        throw std::runtime_error(
+        throw internal_error{
           std::format(
             "Could not insert symbol '{}' into global namespace.",
-            info.qualified_name));
+            info.qualified_name)};
     }
 
     if(!info.reference.has_value())
     {
-        throw std::runtime_error(
+        throw internal_error{
           std::format(
             "External symbol '{}' has no import reference.",
-            info.qualified_name));
+            info.qualified_name)};
     }
     const auto* external_reference = std::get<const module_::exported_symbol*>(
       info.reference.value());
@@ -455,10 +455,10 @@ std::optional<sema::symbol_id> context::resolve_external(
                       sema_env.global_scope_id)
               .has_value())
         {
-            throw std::runtime_error(
+            throw internal_error{
               std::format(
                 "Expected module reference '{}' to already be resolved.",
-                external_reference->name));
+                external_reference->name)};
         }
     }
     else if(external_reference->type == module_::symbol_type::type)
@@ -469,11 +469,11 @@ std::optional<sema::symbol_id> context::resolve_external(
     }
     else
     {
-        throw std::runtime_error(
+        throw internal_error{
           std::format(
             "External symbol '{}' has unhandled type: '{}'.",
             info.qualified_name,
-            sema::to_string(info.type)));
+            sema::to_string(info.type))};
     }
 
     return entry->first;
@@ -541,21 +541,21 @@ std::optional<sema::symbol_id> context::resolve(
 
         if(external_symbol->second.qualified_name != name)
         {
-            throw std::runtime_error(
+            throw internal_error{
               std::format(
                 "Qualified name mismatch during name resolution: Expected '{}', external symbol resolved to '{}'.",
                 name,
-                external_symbol->second.qualified_name));
+                external_symbol->second.qualified_name)};
         }
 
         // insert new declaration.
         auto s_it = sema_env.scope_map.find(sema_env.global_scope_id);
         if(s_it == sema_env.scope_map.end())
         {
-            throw std::runtime_error(
+            throw internal_error{
               std::format(
                 "Cannot insert symbol '{}' into global scope: Scope not found.",
-                external_symbol->second.qualified_name));
+                external_symbol->second.qualified_name)};
         }
 
         auto it = std::ranges::find_if(
@@ -593,7 +593,7 @@ std::optional<sema::symbol_id> context::resolve(
  *
  * @param s Symbol type from the module header.
  * @returns Returns the symbol mapped to `sema::symbol_type`.
- * @throws Throws a `std::runtime_error` if the symbol type could not be mapped.
+ * @throws Throws an `internal_error` if the symbol type could not be mapped.
  */
 sema::symbol_type to_sema_symbol_type(module_::symbol_type s)
 {
@@ -604,10 +604,10 @@ sema::symbol_type to_sema_symbol_type(module_::symbol_type s)
     case module_::symbol_type::macro: return sema::symbol_type::macro;
     case module_::symbol_type::type: return sema::symbol_type::type;
     default:
-        throw std::runtime_error(
+        throw internal_error{
           std::format(
             "Unable to get semantic symbol type from module symbol type '{}'.",
-            std::to_underlying(s)));
+            std::to_underlying(s))};
     }
 }
 
@@ -675,7 +675,8 @@ static std::vector<std::string> topological_order(
 
     if(order.size() != module_graph.size())
     {
-        throw std::runtime_error("Module graph is incomplete or contains a cycle.");
+        throw internal_error{
+          "Module graph is incomplete or contains a cycle."};
     }
 
     return order;

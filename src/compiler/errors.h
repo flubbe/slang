@@ -24,8 +24,8 @@ namespace slang
  * Base for compiler front-end errors that carry a source location.
  *
  * The location and offending text are stored on the exception so that a
- * recovery point (e.g. the command line) can turn the error into a rich,
- * Rust-style diagnostic without string-parsing the message.
+ * recovery point (e.g. the command line) can turn the error into a rich
+ * diagnostic without string-parsing the message.
  */
 struct source_error : public std::runtime_error
 {
@@ -91,10 +91,25 @@ struct source_error : public std::runtime_error
  */
 struct internal_error : public std::runtime_error
 {
-    using std::runtime_error::runtime_error;
-
     /** Source location where the error occurred, if available. */
     std::optional<source_location> location{};
+
+    /**
+     * The human-readable message without any location prefix.
+     *
+     * `what()` carries a `"<line>:<col>: <message>"` prefix when a location is
+     * present (for contexts that print the exception directly); `message` holds
+     * the bare message so the diagnostics can reformat it without parsing.
+     */
+    std::string message{};
+
+    /** Construct from a message only; no location. */
+    internal_error(
+      const std::string& m)
+    : std::runtime_error{m}
+    , message{m}
+    {
+    }
 
     /**
      * Construct with a location and message.
@@ -111,6 +126,7 @@ struct internal_error : public std::runtime_error
           to_string(loc),
           m)}
     , location{loc}
+    , message{m}
     {
     }
 };

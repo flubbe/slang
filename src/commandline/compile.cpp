@@ -343,6 +343,23 @@ void compile::invoke(const std::vector<std::string>& args)
 
         abort_if_errors();
     }
+    catch(const internal_error& e)
+    {
+        auto span = std::optional<diag::source_span>{};
+        if(e.location.has_value())
+        {
+            span = diag::source_span{*e.location, 1};
+        }
+
+        diag_ctx.report_error(
+          module_path.string(),
+          span,
+          e.message.empty()
+            ? std::string{e.what()}
+            : e.message);
+
+        abort_if_errors();
+    }
     catch(const std::exception& e)
     {
         diag_ctx.report_error(
