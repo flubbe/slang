@@ -232,12 +232,11 @@ std::unique_ptr<cg::rvalue> expression::try_emit_const_eval_result(
             return std::make_unique<cg::rvalue>(back_end_type);
         }
 
-        // TODO diagnostics
-
-        std::println(
-          stderr,
-          "{}: Warning: Attempted constant expression computation failed.",
-          slang::to_string(loc));
+        ctx.get_diagnostics().report_warning(
+          ctx.get_filename(),
+          loc,
+          std::format(
+            "Attempted constant expression computation failed."));
     }
 
     return {};
@@ -848,13 +847,12 @@ std::optional<ty::type_id> literal_expression::type_check(
                    && v != 0.0
                    && std::isfinite(v))
                 {
-                    // TODO diagnostics
-
-                    std::println(
-                      stderr,
-                      "{}: Warning: Floating point literal '{}' underflows to 0.0 in f32.",
-                      slang::to_string(loc),
-                      tok.s);
+                    ctx.get_diagnostics().report_warning(
+                      ctx.get_filename(),
+                      loc,
+                      std::format(
+                        "Floating point literal '{}' underflows to 0.0 in f32.",
+                        tok.s));
                 }
 
                 expr_type = ctx.get_f32_type();
@@ -5330,12 +5328,10 @@ void block::generate_code(
     {
         if(expr->is_pure(ctx))
         {
-            // TODO diagnostics.
-
-            std::println(
-              stderr,
-              "{}: Expression has no effect.",
-              slang::to_string(expr->get_location()));
+            ctx.get_diagnostics().report_warning(
+              ctx.get_filename(),
+              expr->get_location(),
+              "Expression has no effect.");
 
             // don't generate code.
             continue;
@@ -5368,12 +5364,12 @@ std::unique_ptr<cg::rvalue> block::emit_rvalue(
 
         if(expr->is_pure(ctx))
         {
-            // TODO diagnostics
+            ctx.get_diagnostics().report_warning(
+              ctx.get_filename(),
+              expr->get_location(),
+              "Expression has no effect.");
 
-            std::println(
-              stderr,
-              "{}: Expression has no effect.",
-              slang::to_string(expr->get_location()));
+            // don't generate code.
             continue;
         }
 

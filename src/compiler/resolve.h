@@ -196,6 +196,8 @@ public:
      * @param const_env The constant environment.
      * @param macro_env The macro environment.
      * @param type_ctx The type context.
+     * @param diags Diagnostics context.
+     * @param filename Name of the current file.
      */
     context(
       sema::env& sema_env,
@@ -220,20 +222,22 @@ public:
     context& operator=(const context&) = delete;
     context& operator=(context&&) = delete;
 
+    /** Return diagnostics context. */
+    [[nodiscard]]
+    diag::context& get_diagnostics() const
+    {
+        return diags;
+    }
+
     /** Set current filename. */
     void set_filename(std::string file)
     {
         filename = std::move(file);
     }
 
-    /** Return diagnostics context. */
-    [[nodiscard]] diag::context& get_diagnostics() const
-    {
-        return diags;
-    }
-
     /** Return current filename. */
-    [[nodiscard]] const std::string& get_filename() const
+    [[nodiscard]]
+    const std::string& get_filename() const
     {
         return filename;
     }

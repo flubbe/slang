@@ -219,7 +219,9 @@ void compile::invoke(const std::vector<std::string>& args)
         sema::env sema_env;
         const_::env const_env;
         macro::env macro_env;
-        ty::context type_ctx;
+        ty::context type_ctx{
+          diag_ctx,
+          module_path.string()};
         co::context co_ctx{sema_env};
         rs::context resolver_ctx{
           sema_env,
@@ -229,7 +231,12 @@ void compile::invoke(const std::vector<std::string>& args)
           diag_ctx,
           module_path.string()};
         tl::context lowering_ctx{type_ctx};
-        cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
+        cg::context codegen_ctx{
+          sema_env,
+          const_env,
+          lowering_ctx,
+          diag_ctx,
+          module_path.string()};
         cfg::simplify cfg_context{codegen_ctx};
         slang::instruction_emitter emitter{
           sema_env,

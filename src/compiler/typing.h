@@ -195,6 +195,13 @@ struct type_info
 /** Type system context. */
 class context
 {
+    /** Diagnostic context reference. */
+    diag::context& diags;
+
+    /** Filename of the currently compiled file. */
+    // FIXME Should this be solved differently? (used for diagnostics reporting)
+    std::string filename;
+
     /** Next type id. */
     std::size_t next_type_id = 0;
 
@@ -241,8 +248,17 @@ class context
     type_id str_type;
 
 public:
-    /** Create a typing context. */
-    context()
+    /**
+     * Create a typing context.
+     *
+     * @param diags Diagnostics context.
+     * @param filename Name of the current file.
+     */
+    context(
+      diag::context& diag_ctx = default_diagnostics(),
+      std::string filename = "")
+    : diags{diag_ctx}
+    , filename{std::move(filename)}
     {
         initialize_builtins();
     }
@@ -254,6 +270,26 @@ public:
     /** Deleted assignments. */
     context& operator=(const context&) = delete;
     context& operator=(context&&) = delete;
+
+    /** Return diagnostics context. */
+    [[nodiscard]]
+    diag::context& get_diagnostics() const
+    {
+        return diags;
+    }
+
+    /** Set current filename. */
+    void set_filename(std::string file)
+    {
+        filename = std::move(file);
+    }
+
+    /** Return current filename. */
+    [[nodiscard]]
+    const std::string& get_filename() const
+    {
+        return filename;
+    }
 
     /**
      * Add a builtin type.

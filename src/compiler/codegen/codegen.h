@@ -24,6 +24,7 @@
 #include "archives/archive.h"
 #include "archives/memory.h"
 #include "compiler/constant.h"
+#include "compiler/diagnostics.h"
 #include "compiler/directive.h"
 #include "compiler/errors.h"
 #include "compiler/lowering.h"
@@ -64,6 +65,15 @@ namespace slang::codegen
 
 namespace ty = slang::typing;
 namespace tl = slang::lowering;
+
+namespace diag = slang::compiler::diagnostics;
+
+/** Return a default, fallback diagnostic context for contexts where none is explicitly provided. */
+inline diag::context& default_diagnostics()
+{
+    static thread_local diag::context fallback;
+    return fallback;
+}
 
 /** Name resolution. */
 struct name_resolver
@@ -1645,6 +1655,13 @@ class context
     /** Type lowering context. */
     tl::context& lowering_ctx;
 
+    /** Diagnostic context reference. */
+    diag::context& diags;
+
+    /** Filename of the currently compiled file. */
+    // FIXME Should this be solved differently? (used for diagnostics reporting)
+    std::string filename;
+
     /** List of functions. */
     std::vector<std::unique_ptr<function>> funcs;
 
@@ -1703,14 +1720,21 @@ public:
      * @param sema_env The semantic environment.
      * @param const_env The constant evaluation environment.
      * @param lowering_ctx Type lowering context.
+     * @param diag_ctx Optional diagnostics context.
+     * @param diags Diagnostics context.
+     * @param filename Name of the current file.
      */
     context(
       sema::env& sema_env,
       const_::env& const_env,
-      tl::context& lowering_ctx)
+      tl::context& lowering_ctx,
+      diag::context& diag_ctx = default_diagnostics(),
+      std::string filename = "")
     : sema_env{sema_env}
     , const_env{const_env}
     , lowering_ctx{lowering_ctx}
+    , diags{diag_ctx}
+    , filename{std::move(filename)}
     {
     }
 
@@ -1758,6 +1782,26 @@ public:
     const tl::context& get_lowering_context() const
     {
         return lowering_ctx;
+    }
+
+    /** Return diagnostics context. */
+    [[nodiscard]]
+    diag::context& get_diagnostics() const
+    {
+        return diags;
+    }
+
+    /** Set current filename. */
+    void set_filename(std::string file)
+    {
+        filename = std::move(file);
+    }
+
+    /** Return current filename. */
+    [[nodiscard]]
+    const std::string& get_filename() const
+    {
+        return filename;
     }
 
     /**
