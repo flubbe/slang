@@ -86,7 +86,7 @@ add_gtest_executable(test_package
     ../src/utils.cpp
 )
 
-add_gtest_executable(test_diagnostics test_diagnostics.cpp)
+add_gtest_executable(test_diagnostics diagnostics/test_diagnostics.cpp)
 target_link_libraries(test_diagnostics PRIVATE slang_test_frontend_core)
 
 add_gtest_executable(test_constant_diagnostics
