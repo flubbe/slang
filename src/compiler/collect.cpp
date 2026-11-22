@@ -136,7 +136,8 @@ sema::symbol_id context::declare(
         throw redefinition_error(
           tok.s,
           tok.location,
-          original->second.loc).with_help(
+          original->second.loc)
+          .with_help(
             "rename one of the declarations or remove the duplicate "
             "to resolve the conflicting symbols");
     }
@@ -172,7 +173,8 @@ sema::symbol_id context::declare(
         throw redefinition_error(
           entry->second.name,
           tok.location,
-          entry->second.loc).with_help(
+          entry->second.loc)
+          .with_help(
             "rename one of the declarations or remove the duplicate "
             "to resolve the conflicting symbols");
     }
@@ -239,7 +241,8 @@ bool context::declare_external(
         throw redefinition_error(
           entry->second.name,
           loc,
-          entry->second.loc).with_help(
+          entry->second.loc)
+          .with_help(
             "rename one of the declarations or remove the duplicate "
             "to resolve the conflicting symbols");
     }
