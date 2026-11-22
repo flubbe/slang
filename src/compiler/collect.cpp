@@ -41,11 +41,13 @@ redefinition_error::redefinition_error(
   const std::string& symbol_name,
   source_location loc,    // NOLINT(bugprone-easily-swappable-parameters)
   source_location original_loc)
-: collection_error{std::format(
-    "{}: Redeclaration of '{}' (was already defined at {})",
-    to_string(loc),
-    symbol_name,
-    to_string(original_loc))}
+: collection_error{
+    loc,
+    std::format(
+      "Redeclaration of '{}' (was already defined at {})",
+      symbol_name,
+      to_string(original_loc)),
+    symbol_name}
 , symbol_name{symbol_name}
 , loc{loc}
 , original_loc{original_loc}
@@ -69,7 +71,7 @@ sema::scope_id context::create_scope(
     if(parent == sema::scope::invalid_id
        && !env.scope_map.empty())
     {
-        throw std::runtime_error("Scope table not empty.");
+        throw internal_error("Scope table not empty.");
     }
 
     auto new_scope_id = generate_scope_id();
@@ -83,7 +85,7 @@ sema::scope_id context::create_scope(
          .bindings = {}}});
     if(!success)
     {
-        throw collection_error(
+        throw collection_error(    // TODO internal error, or redefinition error?
           std::format(
             "Scope with id '{}' already exists to scope table.",
             new_scope_id));
@@ -124,17 +126,20 @@ sema::symbol_id context::declare(
         auto original = env.symbol_table.find(symbol_id);
         if(original == env.symbol_table.end())
         {
-            throw std::runtime_error(
+            throw internal_error(
+              tok.location,
               std::format(
-                "{}: Redefinition of symbol '{}', but original definition not found in symbol table.",
-                to_string(tok.location),
+                "Redefinition of symbol '{}', but original definition not found in symbol table.",
                 tok.s));
         }
 
         throw redefinition_error(
           tok.s,
           tok.location,
-          original->second.loc);
+          original->second.loc)
+          .with_help(
+            "rename one of the declarations or remove the duplicate "
+            "to resolve the conflicting symbols");
     }
 
     // insert new declaration.
@@ -168,7 +173,10 @@ sema::symbol_id context::declare(
         throw redefinition_error(
           entry->second.name,
           tok.location,
-          entry->second.loc);
+          entry->second.loc)
+          .with_help(
+            "rename one of the declarations or remove the duplicate "
+            "to resolve the conflicting symbols");
     }
 
     if(transitive)
@@ -233,7 +241,10 @@ bool context::declare_external(
         throw redefinition_error(
           entry->second.name,
           loc,
-          entry->second.loc);
+          entry->second.loc)
+          .with_help(
+            "rename one of the declarations or remove the duplicate "
+            "to resolve the conflicting symbols");
     }
 
     return true;
@@ -281,17 +292,16 @@ void context::push_scope(sema::scope_id id)
 {
     if(id == sema::scope::invalid_id)
     {
-        throw collection_error(
-          std::format(
-            "Cannot enter invalid scope."));
+        throw internal_error{
+          "Cannot enter invalid scope."};
     }
 
     if(!has_scope(env, id))
     {
-        throw collection_error(
+        throw internal_error{
           std::format(
             "Cannot enter unknown scope '{}'.",
-            id));
+            id)};
     }
 
     current_scope = id;
@@ -306,7 +316,7 @@ void context::pop_scope()
         if(reference == nullptr
            || !has_scope(reference->env, current_scope))
         {
-            throw std::runtime_error("Invalid scope after pop.");
+            throw internal_error("Invalid scope after pop.");
         }
     }
 }
@@ -314,7 +324,7 @@ void context::pop_scope()
 /**
  * Scope getter implementation.
  *
- * @throws Throws `std::runtime_error` if the scope id is
+ * @throws Throws `internal_error` if the scope id is
  *         invalid or if the scope is not found.
  * @param env Environment to search for the scope.
  * @param id Scope id.
@@ -331,13 +341,13 @@ T* get_scope(
 {
     if(id == sema::scope::invalid_id)
     {
-        throw std::runtime_error("Invalid scope id.");
+        throw internal_error("Invalid scope id.");
     }
 
     auto it = env.scope_map.find(id);
     if(it == env.scope_map.end())
     {
-        throw std::runtime_error("Scope not found in scope table.");
+        throw internal_error("Scope not found in scope table.");
     }
 
     return &it->second;
@@ -359,7 +369,7 @@ std::string context::get_canonical_scope_name(sema::scope_id id) const
     {
         if(reference == nullptr)
         {
-            throw std::runtime_error("Scope not found in scope table.");
+            throw internal_error("Scope not found in scope table.");
         }
 
         return reference->get_canonical_scope_name(id);
@@ -380,7 +390,7 @@ std::string context::get_canonical_scope_name(sema::scope_id id) const
     {
         if(reference == nullptr)
         {
-            throw std::runtime_error("Scope not found in scope table.");
+            throw internal_error("Scope not found in scope table.");
         }
 
         return name::qualified_name(

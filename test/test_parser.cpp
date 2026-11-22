@@ -4,7 +4,7 @@
  * Parser tests.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -53,7 +53,7 @@ TEST(parser, parse_expression_token_stream_rejects_empty_input)
 {
     EXPECT_THROW(
       slang::parser::parse_expression(slang::token_stream{}),
-      slang::syntax_error);
+      slang::parser_error);
 }
 
 TEST(parser, parse_expression_token_stream_rejects_block)
@@ -321,7 +321,9 @@ TEST(parser, operators)
 {
     {
         const std::string test_input =
-          "let a: i32 = 1 + 1;";
+          "fn test() -> void {\n"
+          "\tlet a: i32 = 1 + 1;\n"
+          "}";
 
         slang::parser parser;
         ASSERT_NO_THROW(parser.parse(
@@ -331,20 +333,35 @@ TEST(parser, operators)
         const std::string expected =
           "TranslationUnit("
             "decls=("
-              "VariableDeclaration("
-                "name=a, "
-                "type=TypeExpression("
-                  "name=i32, "
-                  "namespaces=(), "
-                  "array=false"
-                "), "
-                "expr=Binary("
-                  "op=\"+\", "
-                  "lhs=IntLiteral("
-                    "value=1"
+              "Function("
+                "prototype=Prototype("
+                  "name=test, "
+                  "return_type=TypeExpression("
+                    "name=void, "
+                    "namespaces=(), "
+                    "array=false"
                   "), "
-                  "rhs=IntLiteral("
-                    "value=1"
+                  "args=()"
+                "), "
+                "body=Block("
+                  "exprs=("  
+                    "VariableDeclaration("
+                      "name=a, "
+                      "type=TypeExpression("
+                        "name=i32, "
+                        "namespaces=(), "
+                        "array=false"
+                      "), "
+                      "expr=Binary("
+                        "op=\"+\", "
+                        "lhs=IntLiteral("
+                          "value=1"
+                        "), "
+                        "rhs=IntLiteral("
+                          "value=1"
+                        ")"
+                      ")"
+                    ")"
                   ")"
                 ")"
               ")"
@@ -356,7 +373,9 @@ TEST(parser, operators)
     }
     {
         const std::string test_input =
-          "let a: i32 = 2 * 1 + 1;";
+          "fn test() -> void {\n"
+          "\tlet a: i32 = 2 * 1 + 1;\n"
+          "}";
 
         slang::parser parser;
         ASSERT_NO_THROW(parser.parse(
@@ -366,65 +385,40 @@ TEST(parser, operators)
         const std::string expected = 
           "TranslationUnit("
             "decls=("
-              "VariableDeclaration("
-                "name=a, "
-                "type=TypeExpression("
-                  "name=i32, "
-                  "namespaces=(), "
-                  "array=false"
-                "), "
-                "expr=Binary("
-                "op=\"+\", "
-                "lhs=Binary("
-                  "op=\"*\", "
-                  "lhs=IntLiteral("
-                    "value=2"
+              "Function("
+                "prototype=Prototype("
+                  "name=test, "
+                  "return_type=TypeExpression("
+                    "name=void, "
+                    "namespaces=(), "
+                    "array=false"
                   "), "
-                  "rhs=IntLiteral("
-                    "value=1"
-                  ")"
+                  "args=()"
                 "), "
-                "rhs=IntLiteral("
-                  "value=1"
-                ")"
-                ")"
-              ")"
-            ")"
-          ")";
-        // clang-format on
-        EXPECT_EQ(parser.get_ast()->to_string(), expected);
-    }
-    {
-        const std::string test_input =
-          "let a: i32 = 2 + 1 * 1;";
-
-        slang::parser parser;
-        ASSERT_NO_THROW(parser.parse(
-          slang::lexer::lex(test_input)));
-
-        // clang-format off
-        const std::string expected = 
-          "TranslationUnit("
-            "decls=("
-              "VariableDeclaration("
-                "name=a, "
-                "type=TypeExpression("
-                  "name=i32, "
-                  "namespaces=(), "
-                  "array=false"
-                "), "
-                "expr=Binary("
-                  "op=\"+\", "
-                  "lhs=IntLiteral("
-                    "value=2"
-                  "), "
-                  "rhs=Binary("
-                    "op=\"*\", "
-                    "lhs=IntLiteral("
-                      "value=1"
-                    "), "
-                    "rhs=IntLiteral("
-                      "value=1"
+                "body=Block("
+                  "exprs=("  
+                    "VariableDeclaration("
+                      "name=a, "
+                      "type=TypeExpression("
+                        "name=i32, "
+                        "namespaces=(), "
+                        "array=false"
+                      "), "
+                      "expr=Binary("
+                        "op=\"+\", "
+                        "lhs=Binary("
+                          "op=\"*\", "
+                          "lhs=IntLiteral("
+                            "value=2"
+                          "), "
+                          "rhs=IntLiteral("
+                            "value=1"
+                          ")"
+                        "), "
+                        "rhs=IntLiteral("
+                          "value=1"
+                        ")"
+                      ")"
                     ")"
                   ")"
                 ")"
@@ -436,7 +430,9 @@ TEST(parser, operators)
     }
     {
         const std::string test_input =
-          "let a: i32 = b = c = 1;";
+          "fn test() -> void {\n"
+          "\tlet a: i32 = 2 + 1 * 1;\n"
+          "}";
 
         slang::parser parser;
         ASSERT_NO_THROW(parser.parse(
@@ -446,25 +442,40 @@ TEST(parser, operators)
         const std::string expected = 
           "TranslationUnit("
             "decls=("
-              "VariableDeclaration("
-                "name=a, "
-                "type=TypeExpression("
-                  "name=i32, "
-                  "namespaces=(), "
-                  "array=false"
-                "), "
-                "expr=Assign("
-                  "op=\"=\", "
-                  "lhs=VariableReference("
-                    "name=b"
+              "Function("
+                "prototype=Prototype("
+                  "name=test, "
+                  "return_type=TypeExpression("
+                    "name=void, "
+                    "namespaces=(), "
+                    "array=false"
                   "), "
-                  "rhs=Assign("
-                    "op=\"=\", "
-                    "lhs=VariableReference("
-                      "name=c"
-                    "), "
-                    "rhs=IntLiteral("
-                      "value=1"
+                  "args=()"
+                "), "
+                "body=Block("
+                  "exprs=("  
+                    "VariableDeclaration("
+                      "name=a, "
+                      "type=TypeExpression("
+                        "name=i32, "
+                        "namespaces=(), "
+                        "array=false"
+                      "), "
+                      "expr=Binary("
+                        "op=\"+\", "
+                        "lhs=IntLiteral("
+                          "value=2"
+                        "), "
+                        "rhs=Binary("
+                          "op=\"*\", "
+                          "lhs=IntLiteral("
+                            "value=1"
+                          "), "
+                          "rhs=IntLiteral("
+                            "value=1"
+                          ")"
+                        ")"
+                      ")"
                     ")"
                   ")"
                 ")"
@@ -476,7 +487,66 @@ TEST(parser, operators)
     }
     {
         const std::string test_input =
-          "let a: i32 = 1 + b * (c = 3 = 4) / 5 & 6;";
+          "fn test() -> void {\n"
+          "\tlet a: i32 = b = c = 1;"
+          "}";
+
+        slang::parser parser;
+        ASSERT_NO_THROW(parser.parse(
+          slang::lexer::lex(test_input)));
+
+        // clang-format off
+        const std::string expected = 
+          "TranslationUnit("
+            "decls=("
+              "Function("
+                "prototype=Prototype("
+                  "name=test, "
+                  "return_type=TypeExpression("
+                    "name=void, "
+                    "namespaces=(), "
+                    "array=false"
+                  "), "
+                  "args=()"
+                "), "
+                "body=Block("
+                  "exprs=("  
+                    "VariableDeclaration("
+                      "name=a, "
+                      "type=TypeExpression("
+                        "name=i32, "
+                        "namespaces=(), "
+                        "array=false"
+                      "), "
+                      "expr=Assign("
+                        "op=\"=\", "
+                        "lhs=VariableReference("
+                          "name=b"
+                        "), "
+                        "rhs=Assign("
+                          "op=\"=\", "
+                          "lhs=VariableReference("
+                            "name=c"
+                          "), "
+                          "rhs=IntLiteral("
+                            "value=1"
+                          ")"
+                        ")"
+                      ")"
+                    ")"
+                  ")"
+                ")"
+              ")"
+            ")"
+          ")";
+        // clang-format on
+        EXPECT_EQ(parser.get_ast()->to_string(), expected);
+    }
+    {
+        const std::string test_input =
+          "fn test() -> void {\n"
+          "\tlet a: i32 = 1 + b * (c = 3 = 4) / 5 & 6;"
+          "}";
 
         slang::parser parser;
         EXPECT_NO_THROW(parser.parse(
@@ -484,8 +554,10 @@ TEST(parser, operators)
     }
     {
         const std::string test_input =
-          "let s: i32 = ++a * --b;\n"
-          "let t: i32 = a++ * b--;\n";
+          "fn test() -> void {\n"
+          "\tlet s: i32 = ++a * --b;\n"
+          "\tlet t: i32 = a++ * b--;\n"
+          "}";
 
         slang::parser parser;
         EXPECT_NO_THROW(parser.parse(
@@ -495,48 +567,63 @@ TEST(parser, operators)
         const std::string expected =
           "TranslationUnit("
             "decls=("
-              "VariableDeclaration("
-                "name=s, "
-                "type=TypeExpression("
-                  "name=i32, "
-                  "namespaces=(), "
-                  "array=false"
-                "), "
-                "expr=Binary("
-                  "op=\"*\", "
-                  "lhs=Unary(op=\"++\", "
-                  "operand=VariableReference("
-                    "name=a"
-                  ")"
-                "), "
-                "rhs=Unary("
-                  "op=\"--\", "
-                    "operand=VariableReference("
-                      "name=b"
-                    ")"
-                  ")"
-                ")"
-              "), "
-              "VariableDeclaration("
-                "name=t, "
-                "type=TypeExpression("
-                  "name=i32, "
-                  "namespaces=(), "
-                  "array=false"
-                "), "
-                "expr=Binary("
-                  "op=\"*\", "
-                  "lhs=Postfix("
-                    "expr=VariableReference("
-                      "name=a"
-                    "), "
-                    "op=\"++\""
+              "Function("
+                "prototype=Prototype("
+                  "name=test, "
+                  "return_type=TypeExpression("
+                    "name=void, "
+                    "namespaces=(), "
+                    "array=false"
                   "), "
-                  "rhs=Postfix("
-                    "expr=VariableReference("
-                      "name=b"
+                  "args=()"
+                "), "
+                "body=Block("
+                  "exprs=("  
+                    "VariableDeclaration("
+                      "name=s, "
+                      "type=TypeExpression("
+                        "name=i32, "
+                        "namespaces=(), "
+                        "array=false"
+                      "), "
+                      "expr=Binary("
+                        "op=\"*\", "
+                        "lhs=Unary(op=\"++\", "
+                        "operand=VariableReference("
+                          "name=a"
+                        ")"
+                      "), "
+                      "rhs=Unary("
+                        "op=\"--\", "
+                          "operand=VariableReference("
+                            "name=b"
+                          ")"
+                        ")"
+                      ")"
                     "), "
-                    "op=\"--\""
+                    "VariableDeclaration("
+                      "name=t, "
+                      "type=TypeExpression("
+                        "name=i32, "
+                        "namespaces=(), "
+                        "array=false"
+                      "), "
+                      "expr=Binary("
+                        "op=\"*\", "
+                        "lhs=Postfix("
+                          "expr=VariableReference("
+                            "name=a"
+                          "), "
+                          "op=\"++\""
+                        "), "
+                        "rhs=Postfix("
+                          "expr=VariableReference("
+                            "name=b"
+                          "), "
+                          "op=\"--\""
+                        ")"
+                      ")"
+                    ")"
                   ")"
                 ")"
               ")"
@@ -750,7 +837,7 @@ TEST(parser, variable_declaration)
         const std::string test_input =
           "import std;\n"
           "\n"
-          "let k : i32 = 3;\n"
+          "const k : i32 = 3;\n"
           "\n"
           "fn main(args: str[]) -> i32\n"
           "{\n"
@@ -848,7 +935,9 @@ TEST(parser, variable_declaration)
 TEST(parser, explicit_cast)
 {
     const std::string test_input =
-      "let k: i32 = 3.0 as i32;";
+      "fn test() -> void {\n"
+      "\tlet k: i32 = 3.0 as i32;\n"
+      "}";
 
     slang::parser parser;
     ASSERT_NO_THROW(parser.parse(
@@ -858,21 +947,36 @@ TEST(parser, explicit_cast)
     const std::string expected =
       "TranslationUnit("
         "decls=("
-          "VariableDeclaration("
-            "name=k, "
-            "type=TypeExpression("
-              "name=i32, "
-              "namespaces=(), "
-              "array=false"
-            "), "
-            "expr=TypeCast("
-              "target_type=TypeExpression("
-               "name=i32, "
-               "namespaces=(), "
-               "array=false"
+          "Function("
+            "prototype=Prototype("
+              "name=test, "
+              "return_type=TypeExpression("
+                "name=void, "
+                "namespaces=(), "
+                "array=false"
               "), "
-              "expr=FloatLiteral("
-                "value=3"
+              "args=()"
+            "), "
+            "body=Block("
+              "exprs=("  
+                "VariableDeclaration("
+                  "name=k, "
+                  "type=TypeExpression("
+                    "name=i32, "
+                    "namespaces=(), "
+                    "array=false"
+                  "), "
+                  "expr=TypeCast("
+                    "target_type=TypeExpression("
+                     "name=i32, "
+                     "namespaces=(), "
+                     "array=false"
+                    "), "
+                    "expr=FloatLiteral("
+                      "value=3"
+                    ")"
+                  ")"
+                ")"
               ")"
             ")"
           ")"
@@ -945,8 +1049,10 @@ TEST(parser, struct_initialization)
           "{\n"
           " a: i32\n"
           "};\n"
-          "let s1: S = S{123};\n"
-          "let s2: S = S{a: 124, b: 2};";
+          "fn f() -> void {\n"
+          " let s1: S = S{123};\n"
+          " let s2: S = S{a: 124, b: 2};\n"
+          "}";
 
         slang::parser parser;
         EXPECT_NO_THROW(parser.parse(
@@ -984,7 +1090,9 @@ TEST(parser, struct_member_access)
 {
     {
         const std::string test_input =
-          "let s1: i32 = s.a;";
+          "fn test() -> void {\n"
+          " let s1: i32 = s.a;\n"
+          "}";
 
         slang::parser parser;
         ASSERT_NO_THROW(parser.parse(
@@ -994,58 +1102,34 @@ TEST(parser, struct_member_access)
         const std::string expected =
           "TranslationUnit("
             "decls=("
-              "VariableDeclaration("
-                "name=s1, "
-                "type=TypeExpression("
-                  "name=i32, "
-                  "namespaces=(), "
-                  "array=false"
-                "), "
-                "expr=Access("
-                  "lhs=VariableReference("
-                    "name=s"
+              "Function("
+                "prototype=Prototype("
+                  "name=test, "
+                  "return_type=TypeExpression("
+                    "name=void, "
+                    "namespaces=(), "
+                    "array=false"
                   "), "
-                  "rhs=VariableReference("
-                    "name=a"
-                  ")"
-                ")"
-              ")"
-            ")"
-          ")";
-        // clang-format on
-
-        EXPECT_EQ(parser.get_ast()->to_string(), expected);
-    }
-    {
-        const std::string test_input =
-          "let s1: i32 = s.a.b;";
-
-        slang::parser parser;
-        ASSERT_NO_THROW(parser.parse(
-          slang::lexer::lex(test_input)));
-
-        // clang-format off
-        const std::string expected =
-          "TranslationUnit("
-            "decls=("
-              "VariableDeclaration("
-                "name=s1, "
-                "type=TypeExpression("
-                  "name=i32, "
-                  "namespaces=(), "
-                  "array=false"
+                  "args=()"
                 "), "
-                "expr=Access("
-                  "lhs=Access("
-                    "lhs=VariableReference("
-                      "name=s"
-                    "), "
-                    "rhs=VariableReference("
-                      "name=a"
+                "body=Block("
+                  "exprs=("  
+                    "VariableDeclaration("
+                      "name=s1, "
+                      "type=TypeExpression("
+                        "name=i32, "
+                        "namespaces=(), "
+                        "array=false"
+                      "), "
+                      "expr=Access("
+                        "lhs=VariableReference("
+                          "name=s"
+                        "), "
+                        "rhs=VariableReference("
+                          "name=a"
+                        ")"
+                      ")"
                     ")"
-                  "), "
-                  "rhs=VariableReference("
-                    "name=b"
                   ")"
                 ")"
               ")"
@@ -1057,7 +1141,65 @@ TEST(parser, struct_member_access)
     }
     {
         const std::string test_input =
-          "let s1: i32 = s.a.b + t.c;";
+          "fn test() -> void {\n"
+          " let s1: i32 = s.a.b;\n"
+          "}";
+
+        slang::parser parser;
+        ASSERT_NO_THROW(parser.parse(
+          slang::lexer::lex(test_input)));
+
+        // clang-format off
+        const std::string expected =
+          "TranslationUnit("
+            "decls=("
+              "Function("
+                "prototype=Prototype("
+                  "name=test, "
+                  "return_type=TypeExpression("
+                    "name=void, "
+                    "namespaces=(), "
+                    "array=false"
+                  "), "
+                  "args=()"
+                "), "
+                "body=Block("
+                  "exprs=("  
+                    "VariableDeclaration("
+                      "name=s1, "
+                      "type=TypeExpression("
+                        "name=i32, "
+                        "namespaces=(), "
+                        "array=false"
+                      "), "
+                      "expr=Access("
+                        "lhs=Access("
+                          "lhs=VariableReference("
+                            "name=s"
+                          "), "
+                          "rhs=VariableReference("
+                            "name=a"
+                          ")"
+                        "), "
+                        "rhs=VariableReference("
+                          "name=b"
+                        ")"
+                      ")"
+                    ")"
+                  ")"
+                ")"
+              ")"
+            ")"
+          ")";
+        // clang-format on
+
+        EXPECT_EQ(parser.get_ast()->to_string(), expected);
+    }
+    {
+        const std::string test_input =
+          "fn test() -> void {\n"
+          " let s1: i32 = s.a.b + t.c;\n"
+          "}";
 
         slang::parser parser;
         EXPECT_NO_THROW(parser.parse(
@@ -1141,7 +1283,9 @@ TEST(parser, null)
 {
     {
         const std::string test_input =
-          "let s: S = null;";
+          "fn test() -> void {\n"
+          " let s: S = null;\n"
+          "}";
 
         slang::parser parser;
         ASSERT_NO_THROW(parser.parse(

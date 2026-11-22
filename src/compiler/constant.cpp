@@ -4,17 +4,21 @@
  * constant expression info, used e.g. during constant evaluation.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
 #include <format>
 
 #include "ast/ast.h"
+#include "compiler/diagnostics.h"
+#include "compiler/errors.h"
 #include "constant.h"
 
 namespace slang::const_
 {
+
+namespace diag = slang::compiler::diagnostics;
 
 std::string to_string(constant_type c)
 {
@@ -38,10 +42,13 @@ void env::set_const_info(
     {
         if(it->second != info)
         {
-            throw sema::semantic_error(
+            diags.report_error(
+              std::nullopt,
+              std::nullopt,
               std::format(
                 "Constant info already exists for the symbol '{}' with a different value.",
                 id.value));
+            return;
         }
     }
     else
@@ -66,10 +73,13 @@ void env::register_constant(sema::symbol_id id)
 {
     if(constant_registry.contains(id))
     {
-        throw sema::semantic_error(
+        diags.report_error(
+          std::nullopt,
+          std::nullopt,
           std::format(
             "Constant already registered for the symbol '{}'.",
             id.value));
+        return;
     }
 
     constant_registry.insert(id);
@@ -92,10 +102,10 @@ constant_id env::intern(std::int32_t i)
     if(const_literal_map.size() == std::numeric_limits<std::size_t>::max())
     {
         // should never happen.
-        throw std::runtime_error(
+        throw internal_error{
           std::format(
             "Too many constants in constant environment (>= std::numeric_limits<std::size_t>::max() = {})",
-            std::numeric_limits<std::size_t>::max()));
+            std::numeric_limits<std::size_t>::max())};
     }
 
     constant_id id = const_literal_map.size();
@@ -126,10 +136,10 @@ constant_id env::intern(std::int64_t i)
     if(const_literal_map.size() == std::numeric_limits<std::size_t>::max())
     {
         // should never happen.
-        throw std::runtime_error(
+        throw internal_error{
           std::format(
             "Too many constants in constant environment (>= std::numeric_limits<std::size_t>::max() = {})",
-            std::numeric_limits<std::size_t>::max()));
+            std::numeric_limits<std::size_t>::max())};
     }
 
     constant_id id = const_literal_map.size();
@@ -160,10 +170,10 @@ constant_id env::intern(float f)
     if(const_literal_map.size() == std::numeric_limits<std::size_t>::max())
     {
         // should never happen.
-        throw std::runtime_error(
+        throw internal_error{
           std::format(
             "Too many constants in constant environment (>= std::numeric_limits<std::size_t>::max() = {})",
-            std::numeric_limits<std::size_t>::max()));
+            std::numeric_limits<std::size_t>::max())};
     }
 
     constant_id id = const_literal_map.size();
@@ -194,10 +204,10 @@ constant_id env::intern(double d)
     if(const_literal_map.size() == std::numeric_limits<std::size_t>::max())
     {
         // should never happen.
-        throw std::runtime_error(
+        throw internal_error{
           std::format(
             "Too many constants in constant environment (>= std::numeric_limits<std::size_t>::max() = {})",
-            std::numeric_limits<std::size_t>::max()));
+            std::numeric_limits<std::size_t>::max())};
     }
 
     constant_id id = const_literal_map.size();
@@ -228,10 +238,10 @@ constant_id env::intern(std::string s)
     if(const_literal_map.size() == std::numeric_limits<std::size_t>::max())
     {
         // should never happen.
-        throw std::runtime_error(
+        throw internal_error{
           std::format(
             "Too many constants in constant environment (>= std::numeric_limits<std::size_t>::max() = {})",
-            std::numeric_limits<std::size_t>::max()));
+            std::numeric_limits<std::size_t>::max())};
     }
 
     constant_id id = const_literal_map.size();
@@ -259,16 +269,13 @@ void env::set_expression_value(
     const_eval_expr_values[&expr] = std::move(info);
 }
 
-const const_info& env::get_expression_value(
+std::optional<const_info> env::get_expression_value(
   const ast::expression& expr) const
 {
     auto it = const_eval_expr_values.find(&expr);
     if(it == const_eval_expr_values.end())
     {
-        throw sema::semantic_error(
-          std::format(
-            "{}: No evaluation result for expression found.",
-            ::slang::to_string(expr.get_location())));
+        return std::nullopt;
     }
 
     return it->second;

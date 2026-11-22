@@ -15,6 +15,7 @@
 #include <string>
 #include <unordered_map>
 
+#include "compiler/errors.h"
 #include "shared/module.h"
 #include "shared/token_stream.h"
 #include "syntax_context.h"
@@ -22,10 +23,10 @@
 namespace slang::macro
 {
 
-/** A generic error during macro processing. */
-class macro_error : public std::runtime_error
+/** A generic error during macro processing, carrying the call-site location. */
+struct macro_error : public source_error
 {
-    using std::runtime_error::runtime_error;
+    using source_error::source_error;
 };
 
 /** A macro. */
@@ -172,7 +173,10 @@ struct env
     /**
      * Add a macro definition.
      *
-     * @throws Throws a `macro_error` if the macro already exists.
+     * If a macro with the same name and import path already exists, its
+     * descriptor is replaced rather than a duplicate being added, so repeated
+     * import-resolution passes are idempotent.
+     *
      * @param name The macro name.
      * @param desc The macro descriptor.
      * @param import_path Import path of the macro, or `std::nullopt`.
@@ -185,11 +189,11 @@ struct env
       syntax_context_id definition_context = root_syntax_context);
 
     /**
-     * Get a macro.
+     * Look up a macro by name and import path.
      *
-     * @throws Throws a `macro_error` if the macro is not found.
      * @param name The macro name.
      * @param import_path Import path of the macro, or `std::nullopt`.
+     * @return The matching macro, or `nullptr` if none was found.
      */
     macro* get_macro(
       const std::string& name,

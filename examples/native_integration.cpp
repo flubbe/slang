@@ -4,7 +4,7 @@
  * Integration example.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -81,7 +81,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
     }
     catch(const slang::file_error& err)
     {
-        std::println("Error: {}", err.what());
+        std::println(stderr, "Error: {}", err.what());
         return EXIT_FAILURE;
     }
 
@@ -91,7 +91,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
     // Find the function to invoke.
     if(!loader.has_function("test"))
     {
-        std::println("Cannot find function 'test' in module.");
+        std::println(stderr, "Cannot find function 'test' in module.");
         return EXIT_FAILURE;
     }
     si::function& function = loader.get_function("test");
@@ -108,7 +108,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
     }
     catch(const si::interpreter_error& err)
     {
-        std::println("Error: {}", err.what());
+        std::println(stderr, "Error: {}", err.what());
         return EXIT_FAILURE;
     }
 
@@ -117,14 +117,14 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
     if(ret == nullptr)
     {
         // `ret` can be `nullptr` if the return type was not an object.
-        std::println("Got unexpected return type.");
+        std::println(stderr, "Got unexpected return type.");
         return EXIT_FAILURE;
     }
 
     S* ret_s = static_cast<S*>(*ret);
     if(ret_s->s == nullptr)
     {
-        std::println("Received null instead of string.");
+        std::println(stderr, "Received null instead of string.");
     }
     else
     {
@@ -142,14 +142,14 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
     // Check that the memory was cleaned up.
     if(ctx.get_gc().object_count() != 0)
     {
-        std::println("GC: There are objects left.");
+        std::println(stderr, "GC: There are objects left.");
     }
     if(ctx.get_gc().root_set_size() != 0)
     {
-        std::println("GC: There are roots left.");
+        std::println(stderr, "GC: There are roots left.");
     }
     if(ctx.get_gc().byte_size() != 0)
     {
-        std::println("GC: There is memory left.");
+        std::println(stderr, "GC: There is memory left.");
     }
 }

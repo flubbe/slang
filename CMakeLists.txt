@@ -115,6 +115,7 @@ set(SOURCES
     src/compiler/codegen/codegen.cpp
     src/compiler/collect.cpp
     src/compiler/constant.cpp
+    src/compiler/diagnostics.cpp
     src/compiler/emitter.cpp
     src/compiler/lexer.cpp
     src/compiler/loader.cpp

@@ -4,7 +4,7 @@
  * module and import resolution.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -12,6 +12,7 @@
 
 #include <stdexcept>
 
+#include "compiler/errors.h"
 #include "shared/module.h"
 #include "shared/token.h"
 #include "filemanager.h"
@@ -40,18 +41,9 @@ inline std::string make_import_name(
 }
 
 /** A resolve error. */
-class resolve_error : public std::runtime_error
+struct resolve_error : public source_error
 {
-    using std::runtime_error::runtime_error;
-
-public:
-    /**
-     * Construct a resolve_error.
-     *
-     * @param loc The error location in the source.
-     * @param message The error message.
-     */
-    resolve_error(const source_location& loc, const std::string& message);
+    using source_error::source_error;
 };
 
 /** Resolver context. */
@@ -118,6 +110,16 @@ public:
      * @returns Returns the resolved name.
      */
     std::string resolve_name(const std::string& name) const;
+
+    /**
+     * Get available module names across search paths.
+     *
+     * @returns List of available module names.
+     */
+    std::vector<std::string> get_available_modules() const
+    {
+        return file_mgr.get_available_modules();
+    }
 };
 
 }    // namespace slang::loader

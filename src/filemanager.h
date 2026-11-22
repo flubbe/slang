@@ -4,7 +4,7 @@
  * file manager.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -97,6 +97,13 @@ public:
      * @throws A file_error if the path cannot be resolved.
      */
     fs::path resolve(const fs::path& path) const;
+
+    /**
+     * Get available module names across all search paths.
+     *
+     * @returns List of module names in package delimiter notation (e.g. `std`).
+     */
+    std::vector<std::string> get_available_modules() const;
 
     /**
      * Open a file using an archive. If the file path is not an absolute path,

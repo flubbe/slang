@@ -21,39 +21,18 @@
 namespace slang::format_util
 {
 
-namespace
-{
-
-/** Extract the string value from a string literal token. */
-std::string extract_string_literal(const token& tok)
-{
-    if(tok.type != token_type::str_literal)
-    {
-        throw std::runtime_error{"Expected string literal."};
-    }
-
-    const auto& s = tok.s;
-    if(s.length() >= 2)
-    {
-        return s.substr(1, s.length() - 2);
-    }
-
-    return {};
-}
-
-}    // namespace
-
 /*
  * parse_format_string.
  */
 
 std::vector<placeholder> parse_format_string(
-  const std::string& fmt,
-  [[maybe_unused]] source_location loc)
+  std::string_view fmt,
+  source_location loc)
 {
     std::vector<placeholder> placeholders;
     std::optional<placeholder> current{std::nullopt};
     std::string current_specifier;
+    bool has_specifier_delimiter = false;
 
     for(std::size_t i = 0; i < fmt.length(); ++i)
     {
@@ -61,7 +40,8 @@ std::vector<placeholder> parse_format_string(
         {
             if(current.has_value())
             {
-                throw std::runtime_error{
+                throw format_error{
+                  loc.advance(fmt, i),
                   "Invalid format string: nested placeholder."};
             }
 
@@ -80,6 +60,14 @@ std::vector<placeholder> parse_format_string(
         {
             if(current.has_value())
             {
+                if(has_specifier_delimiter
+                   && current_specifier.empty())
+                {
+                    throw format_error{
+                      loc.advance(fmt, i),
+                      "Invalid format string: empty format specifier."};
+                }
+
                 current->end = i + 1;
 
                 if(current_specifier.length() > 1
@@ -88,9 +76,11 @@ std::vector<placeholder> parse_format_string(
                        && current_specifier[0] != 'f'
                        && current_specifier[0] != 's'))
                 {
-                    throw std::runtime_error{
-                      std::string("Unsupported format specifier: '")
-                      + current_specifier + "'."};
+                    throw format_error{
+                      loc.advance(fmt, i),
+                      std::format(
+                        "Unsupported format specifier: '{}'.",
+                        current_specifier)};
                 }
 
                 current->specifier = current_specifier.empty()
@@ -98,6 +88,7 @@ std::vector<placeholder> parse_format_string(
                                        : std::make_optional(
                                            current_specifier[0]);
                 current_specifier.clear();
+                has_specifier_delimiter = false;
 
                 placeholders.push_back(*current);
                 current = std::nullopt;
@@ -112,7 +103,8 @@ std::vector<placeholder> parse_format_string(
                     continue;
                 }
 
-                throw std::runtime_error{
+                throw format_error{
+                  loc.advance(fmt, i),
                   "Invalid format string: unmatched '}'."};
             }
         }
@@ -123,8 +115,17 @@ std::vector<placeholder> parse_format_string(
                 // Skip ':' delimiter before the specifier.
                 if(fmt[i] == ':')
                 {
+                    if(has_specifier_delimiter)
+                    {
+                        throw format_error{
+                          loc.advance(fmt, i),
+                          "Invalid format string: repeated specifier delimiter."};
+                    }
+
+                    has_specifier_delimiter = true;
                     continue;
                 }
+
                 current_specifier += fmt[i];
             }
         }
@@ -132,7 +133,8 @@ std::vector<placeholder> parse_format_string(
 
     if(current.has_value())
     {
-        throw std::runtime_error{
+        throw format_error{
+          loc.advance(fmt, current->start),
           "Invalid format string: unmatched '{'."};
     }
 
@@ -147,7 +149,7 @@ void validate_arg_type(
   typing::type_id arg_type,
   const std::optional<char>& specifier,
   const typing::context& ctx,
-  [[maybe_unused]] source_location loc)
+  source_location loc)
 {
     if(!specifier.has_value())
     {
@@ -160,8 +162,12 @@ void validate_arg_type(
            || arg_type == ctx.get_str_type())
             return;
 
-        throw std::runtime_error{
-          "format!: argument is not convertible to a string."};
+        throw format_error{
+          loc,
+          "format!: argument is not convertible to a string."}
+          .with_help(
+            "without a specifier, the argument must be an integer "
+            "(i8/i16/i32/i64), a float (f32/f64), or a 'str'");
     }
 
     switch(specifier.value())
@@ -172,30 +178,52 @@ void validate_arg_type(
            && arg_type != ctx.get_i32_type()
            && arg_type != ctx.get_i64_type())
         {
-            throw std::runtime_error{
-              "format!: argument has wrong type for 'd' specifier."};
+            throw format_error{
+              loc,
+              "format!: argument has wrong type for 'd' specifier."}
+              .with_label("type mismatch")
+              .with_note(
+                std::format(
+                  "the 'd' specifier expects an integer (i8/i16/i32/i64); got '{}'",
+                  ctx.to_string(arg_type)));
         }
         break;
     case 'f':
         if(arg_type != ctx.get_f32_type()
            && arg_type != ctx.get_f64_type())
         {
-            throw std::runtime_error{
-              "format!: argument has wrong type for 'f' specifier."};
+            throw format_error{
+              loc,
+              "format!: argument has wrong type for 'f' specifier."}
+              .with_label("type mismatch")
+              .with_note(
+                std::format(
+                  "the 'f' specifier expects a float (f32/f64); got '{}'",
+                  ctx.to_string(arg_type)));
         }
         break;
     case 's':
         if(arg_type != ctx.get_str_type())
         {
-            throw std::runtime_error{
-              "format!: argument has wrong type for 's' specifier."};
+            throw format_error{
+              loc,
+              "format!: argument has wrong type for 's' specifier."}
+              .with_label("type mismatch")
+              .with_note(
+                std::format(
+                  "the 's' specifier expects a 'str'; got '{}'",
+                  ctx.to_string(arg_type)));
         }
         break;
     default:
-        throw std::runtime_error{
+        throw format_error{
+          loc,
           std::format(
             "format!: unknown specifier '{}'.",
-            specifier.value())};
+            specifier.value())}
+          .with_label("invalid format specifier")
+          .with_help(
+            "valid specifiers are 'd' (integer), 'f' (float), and 's' (string)");
     }
 }
 

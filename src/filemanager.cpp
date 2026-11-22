@@ -4,13 +4,17 @@
  * file manager.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
+#include <algorithm>
 #include <format>
+#include <system_error>
 
 #include "filemanager.h"
+#include "package.h"
+#include "utils.h"
 
 namespace slang
 {
@@ -70,10 +74,10 @@ fs::path file_manager::resolve(
     {
         if(!fs::is_regular_file(path))
         {
-            throw file_error(
+            throw file_error{
               std::format(
                 "Resolved path '{}' is not a file.",
-                path.string()));
+                path.string())};
         }
         return fs::canonical(path);
     }
@@ -86,10 +90,49 @@ fs::path file_manager::resolve(
         }
     }
 
-    throw file_error(
+    throw file_error{
       std::format(
         "Unable to resolve path '{}'.",
-        path.string()));
+        path.string())};
+}
+
+std::vector<std::string> file_manager::get_available_modules() const
+{
+    std::vector<std::string> modules;
+    const std::string ext = "." + package::module_ext;
+
+    for(const auto& sp: search_paths)
+    {
+        std::error_code ec;
+        if(!fs::exists(sp, ec) || !fs::is_directory(sp, ec))
+        {
+            continue;
+        }
+
+        for(const auto& entry: fs::recursive_directory_iterator(sp, fs::directory_options::skip_permission_denied, ec))
+        {
+            if(ec)
+            {
+                break;
+            }
+            if(entry.is_regular_file(ec) && entry.path().extension() == ext)
+            {
+                auto rel = fs::relative(entry.path(), sp, ec);
+                if(!ec)
+                {
+                    rel.replace_extension("");
+                    std::string mod_name = rel.string();
+                    slang::utils::replace_all(mod_name, "/", package::delimiter);
+                    if(std::ranges::find(modules, mod_name) == modules.end())
+                    {
+                        modules.push_back(std::move(mod_name));
+                    }
+                }
+            }
+        }
+    }
+
+    return modules;
 }
 
 std::unique_ptr<file_archive> file_manager::open(
@@ -116,10 +159,10 @@ std::unique_ptr<file_archive> file_manager::open(
 
     if(resolved_path.empty())
     {
-        throw file_error(
+        throw file_error{
           std::format(
             "Unable to find file '{}' in search paths.",
-            path.string()));
+            path.string())};
     }
 
     if(mode == open_mode::read)
@@ -136,7 +179,7 @@ std::unique_ptr<file_archive> file_manager::open(
           std::endian::little);
     }
 
-    throw std::runtime_error("Invalid file open mode.");
+    throw std::runtime_error{"Invalid file open mode."};
 }
 
 }    // namespace slang

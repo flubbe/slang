@@ -4,7 +4,7 @@
  * type system context.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -17,6 +17,8 @@
 #include <vector>
 
 #include "shared/token.h"
+#include "compiler/diagnostics.h"
+#include "compiler/errors.h"
 #include "sema.h"
 #include "type.h"
 
@@ -31,20 +33,66 @@ class expression; /* ast.h */
 namespace slang::typing
 {
 
-/** Type errors. */
-class type_error : public std::runtime_error
-{
-    using std::runtime_error::runtime_error;
+namespace diag = slang::compiler::diagnostics;
 
-public:
-    /**
-     * Construct a type_error.
-     *
-     * @param loc The error location in the source.
-     * @param message The error message.
-     */
-    type_error(const slang::source_location& loc, const std::string& message);
+/** Return a default, fallback diagnostic context for contexts where none is explicitly provided. */
+inline diag::context& default_diagnostics()
+{
+    static thread_local diag::context fallback;
+    return fallback;
+}
+
+/** Type errors. */
+struct type_error : public source_error
+{
+    using source_error::source_error;
 };
+
+/**
+ * Unwrap a fallible type-context lookup, or throw a `type_error`.
+ *
+ * @param value The result of a fallible getter (e.g. `get_type_info`).
+ * @param message Message used for the thrown error when `value` is empty.
+ * @throws `type_error` if `value` is empty.
+ * @returns Returns the contained value.
+ */
+template<typename T>
+T throw_or(
+  const std::optional<T>& value,
+  const std::string& message)
+{
+    if(!value.has_value())
+    {
+        throw type_error{message};
+    }
+
+    return *value;
+}
+
+/**
+ * Unwrap a fallible type-context lookup, or throw a `type_error` at `loc`.
+ *
+ * @param value The result of a fallible getter (e.g. `get_type_info`).
+ * @param loc The source location of the error.
+ * @param message Message used for the thrown error when `value` is empty.
+ * @param text Offending text, sized into the diagnostic snippet (optional).
+ * @throws `type_error` if `value` is empty.
+ * @returns Returns the contained value.
+ */
+template<typename T>
+T throw_or(
+  const std::optional<T>& value,
+  source_location loc,
+  const std::string& message,
+  std::optional<std::string> text = std::nullopt)
+{
+    if(!value.has_value())
+    {
+        throw type_error{loc, message, text};
+    }
+
+    return *value;
+}
 
 /** Built-in types. */
 enum class builtins
@@ -147,6 +195,13 @@ struct type_info
 /** Type system context. */
 class context
 {
+    /** Diagnostic context reference. */
+    diag::context& diags;
+
+    /** Filename of the currently compiled file. */
+    // FIXME Should this be solved differently? (used for diagnostics reporting)
+    std::string filename;
+
     /** Next type id. */
     std::size_t next_type_id = 0;
 
@@ -161,6 +216,12 @@ class context
       const ast::expression*,
       std::optional<type_id>>
       expression_types;
+
+    /**
+     * Names of types imported from other modules, offered to `get_type_names`
+     * as "did you mean" candidates.
+     */
+    std::vector<std::string> imported_type_names;
 
     /**
      * Generate a new type id.
@@ -187,8 +248,17 @@ class context
     type_id str_type;
 
 public:
-    /** Create a typing context. */
-    context()
+    /**
+     * Create a typing context.
+     *
+     * @param diags Diagnostics context.
+     * @param filename Name of the current file.
+     */
+    context(
+      diag::context& diag_ctx = default_diagnostics(),
+      std::string filename = "")
+    : diags{diag_ctx}
+    , filename{std::move(filename)}
     {
         initialize_builtins();
     }
@@ -200,6 +270,26 @@ public:
     /** Deleted assignments. */
     context& operator=(const context&) = delete;
     context& operator=(context&&) = delete;
+
+    /** Return diagnostics context. */
+    [[nodiscard]]
+    diag::context& get_diagnostics() const
+    {
+        return diags;
+    }
+
+    /** Set current filename. */
+    void set_filename(std::string file)
+    {
+        filename = std::move(file);
+    }
+
+    /** Return current filename. */
+    [[nodiscard]]
+    const std::string& get_filename() const
+    {
+        return filename;
+    }
 
     /**
      * Add a builtin type.
@@ -244,28 +334,26 @@ public:
      * Get the struct info.
      *
      * @param id The struct type id.
-     * @returns Returns the associated `struct_info`.
-     * @throws Throws a `type_error` if the id was not a struct.
+     * @returns Returns a pointer to the associated `struct_info`, or `nullptr` if not found or not a struct.
      */
-    struct_info& get_struct_info(type_id id);
+    struct_info* get_struct_info(type_id id);
 
     /**
      * Get the struct info.
      *
      * @param id The struct type id.
-     * @returns Returns the associated `struct_info`.
-     * @throws Throws a `type_error` if the id was not a struct.
+     * @returns Returns a pointer to the associated `struct_info`, or `nullptr` if not found or not a struct.
      */
-    const struct_info& get_struct_info(type_id id) const;
+    const struct_info* get_struct_info(type_id id) const;
 
     /**
      * Get a struct's field type id by index (including array-related properties).
      *
      * @param struct_type_id The struct type id.
      * @param field_index Field index.
-     * @returns Returns a type id for a field.
+     * @returns Returns a type id for a field, or `std::nullopt` on error.
      */
-    type_id get_field_type(
+    std::optional<type_id> get_field_type(
       type_id struct_type_id,
       std::size_t field_index) const;
 
@@ -275,9 +363,9 @@ public:
      *
      * @param struct_type_id The struct type id.
      * @param field_name The field's name.
-     * @returns Returns the index of the field.
+     * @returns Returns the index of the field, or `std::nullopt` on error.
      */
-    std::size_t get_field_index(
+    std::optional<std::size_t> get_field_index(
       type_id struct_type_id,
       const std::string& field_name) const;
 
@@ -292,28 +380,55 @@ public:
      * Get the id of an existing type.
      *
      * @param name The type's name.
-     * @returns Returns the type id.
-     * @throws Throws a `type_error` if the type is not known.
+     * @returns Returns the type id, or `std::nullopt` if the type is not known.
      */
-    type_id get_type(const std::string& name) const;
+    std::optional<type_id> get_type(
+      const std::string& name) const;
+
+    /** Get all known type names (both builtin and structs, incl. imports). */
+    [[nodiscard]] std::vector<std::string> get_type_names() const;
+
+    /**
+     * Record an imported type name for "did you mean" suggestions.
+     *
+     * @param name The imported type's (qualified) name.
+     */
+    void add_imported_type_name(
+      std::string name)
+    {
+        imported_type_names.emplace_back(
+          std::move(name));
+    }
+
+    /**
+     * Create a located `type_error` for an unknown type, computing a
+     * "did you mean" suggestion from known types.
+     *
+     * @param loc Error source location.
+     * @param name The missing type's name.
+     * @param text The offending token text (optional, defaults to name).
+     */
+    [[nodiscard]] type_error make_type_not_found_error(
+      source_location loc,
+      const std::string& name,
+      std::optional<std::string> text = std::nullopt) const;
 
     /**
      * Get the full type info for an existing type.
      *
      * @param id The type id.
-     * @returns Returns the type info.
-     * @throws Throws a `type_error` if the type is not known.
+     * @returns Returns the type info, or `std::nullopt` if not known.
      */
-    type_info get_type_info(type_id id) const;
+    std::optional<type_info> get_type_info(type_id id) const;
 
     /**
      * Return struct flags.
      *
      * @param id The type id.
-     * @returns Returns a pair `(native, allow_cast)`.
-     * @throws Throws a `type_error` if the type is not known or not a struct.
+     * @returns Returns a pair `(native, allow_cast)`, or `std::nullopt` on error.
      */
-    std::pair<bool, bool> get_type_flags(type_id id) const;
+    std::optional<std::pair<bool, bool>>
+      get_type_flags(type_id id) const;
 
     /**
      * Set struct flags.
@@ -341,19 +456,17 @@ public:
      * Get the base type for a type.
      *
      * @param id The type id.
-     * @returns Returns the type id of the base type.
-     * @throws Throws a `type_error` if the type id could not be found.
+     * @returns Returns the type id of the base type, or `std::nullopt` on error.
      */
-    type_id get_base_type(type_id id) const;
+    std::optional<type_id> get_base_type(type_id id) const;
 
     /**
      * Get the array rank of a type.
      *
      * @param id The type id.
-     * @returns Returns the rank of the array. Return 0 for non-array types.
-     * @throws Throws a `type_error` if the type id could not be found.
+     * @returns Returns the rank of the array, or `std::nullopt` on error.
      */
-    std::size_t get_array_rank(type_id id) const;
+    std::optional<std::size_t> get_array_rank(type_id id) const;
 
     /**
      * Check whether an expression type is known, or it is known to have no type.
@@ -368,9 +481,24 @@ public:
      *
      * @param expr The expression.
      * @param id Type identifier or `std::nullopt` for the expression.
-     * @throws Throws a `type_error` if the expression type is already set.
+     * @returns Returns `true` on success, or `false` if the expression already had a
+     *          different type set. Does not throw.
      */
-    void set_expression_type(
+    bool set_expression_type(
+      const ast::expression& expr,
+      std::optional<type_id> id);
+
+    /**
+     * Set an expression's type id, throwing if it conflicts.
+     *
+     * Like `set_expression_type`, but throws a `type_error` (instead of returning
+     * `false`) when the expression already had a different type set.
+     *
+     * @param expr The expression.
+     * @param id Type identifier or `std::nullopt` for the expression.
+     * @throws Throws a `type_error` if the expression type is already set differently.
+     */
+    void set_expression_type_or_throw(
       const ast::expression& expr,
       std::optional<type_id> id);
 
@@ -378,15 +506,16 @@ public:
      * Get an expression's type id.
      *
      * @param expr The expression.
-     * @throws Throws a `type_error` if the expression type is not known.
+     * @returns Returns the expression's type, or `std::nullopt` if it is unknown.
      */
-    std::optional<type_id> get_expression_type(const ast::expression& expr) const;
+    std::optional<type_id> get_expression_type(
+      const ast::expression& expr) const;
 
     /**
      * Check if a type is built-in.
      *
      * @param id The type id to check.
-     * @returns Returns whether a type is built-in.
+     * @returns Returns whether a type is built-in or `id` is invalid.
      */
     bool is_builtin(type_id id) const;
 
@@ -426,19 +555,21 @@ public:
      * Get the element type of an array type.
      *
      * @param id The array type id.
-     * @returns Returns the element type id.
-     * @throws Throws a `type_error` if the given type was not an array type.
+     * @returns Returns the element type id, or `std::nullopt` on error.
      */
-    type_id array_element_type(type_id id) const;
+    std::optional<type_id> array_element_type(type_id id) const;
 
     /**
-     * Check if types are compatible.
+     * Check if two types are compatible.
      *
      * @param expected The expected type id.
-     * @param actual The actual type.
-     * @returns Returns `true` if the types are compatible, and `false` otherwise.
+     * @param actual The actual type id.
+     * @returns Returns `true` if the types are compatible, and `false` otherwise,
+     *     including when either type id is invalid.
      */
-    bool are_types_compatible(type_id expected, type_id actual) const;
+    bool are_types_compatible(
+      type_id expected,
+      type_id actual) const;
 
     /** Get null type. */
     type_id get_null_type() const
@@ -499,9 +630,11 @@ public:
      *
      * @param id The type to get an array for.
      * @param rank Rank of the array.
-     * @returns Returns an array type.
+     * @returns Returns an array type, or `std::nullopt` on error.
      */
-    type_id get_array(type_id id, std::size_t rank);
+    std::optional<type_id> get_array(
+      type_id id,
+      std::size_t rank);
 
     /**
      * Convert a type id to a string.

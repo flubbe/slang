@@ -34,6 +34,7 @@ add_library(slang_test_frontend_core STATIC
     ../src/compiler/codegen/codegen.cpp
     ../src/compiler/collect.cpp
     ../src/compiler/constant.cpp
+    ../src/compiler/diagnostics.cpp
     ../src/compiler/format_util.cpp
     ../src/compiler/lexer.cpp
     ../src/compiler/loader.cpp
@@ -85,6 +86,14 @@ add_gtest_executable(test_package
     ../src/utils.cpp
 )
 
+add_gtest_executable(test_diagnostics test_diagnostics.cpp)
+target_link_libraries(test_diagnostics PRIVATE slang_test_frontend_core)
+
+add_gtest_executable(test_constant_diagnostics
+    diagnostics/test_constant_diagnostics.cpp
+)
+target_link_libraries(test_constant_diagnostics PRIVATE slang_test_frontend_core)
+
 add_gtest_executable(test_lexer
     test_lexer.cpp
     ../src/compiler/lexer.cpp
@@ -107,7 +116,7 @@ add_gtest_executable(test_codegen
     ../src/compiler/typing.cpp
     ../src/utils.cpp
 )
-target_link_libraries(test_codegen PRIVATE slang_shared_core Microsoft.GSL::GSL)
+target_link_libraries(test_codegen PRIVATE slang_test_frontend_core Microsoft.GSL::GSL)
 
 add_gtest_executable(test_compile_ir test_compile_ir.cpp ../src/compiler/cfg/verify.cpp)
 target_link_libraries(test_compile_ir PRIVATE slang_test_frontend_core)
@@ -177,6 +186,14 @@ target_link_libraries(test_interpreter PRIVATE slang_shared_core Microsoft.GSL::
 set_tests_properties(interpreter PROPERTIES FIXTURES_REQUIRED output)
 
 add_gtest_executable(test_vector test_vector.cpp)
+
+add_gtest_executable(test_builtins
+    macros/test_builtins.cpp
+    ../src/compiler/diagnostics.cpp
+    ../src/compiler/format_util.cpp
+    ../src/compiler/typing.cpp
+    ../src/shared/location.cpp
+)
 
 if(APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
     add_gtest_executable(test_jit_apple_aarch64
@@ -285,12 +302,47 @@ add_jit_compile_test("slang cast" TRUE test/test_cast)
 add_compile_exec_fail_test("slang cast fail" TRUE test/test_cast_fail)
 
 add_compile_fail_test("slang const assign fail" FALSE test/test_const_assign_fail)
+add_compile_fail_test("slang const eval fail" FALSE test/test_const_eval_fail)
 
 add_compile_exec_test("slang const export" TRUE test/test_const_export)
 add_jit_compile_test("slang const export" TRUE test/test_const_export)
 
 add_compile_exec_test("slang const import" TRUE test/test_const_import)
 add_jit_compile_test("slang const import" TRUE test/test_const_import)
+
+add_compile_fail_test("slang const type fail" FALSE test/test_const_type_fail)
+
+add_my_test("slang type typo suggest" slang compile test/fail/test_type_typo_fail)
+set_tests_properties("slang type typo suggest"
+    PROPERTIES
+    WILL_FAIL TRUE
+    FAIL_REGULAR_EXPRESSION "did you mean `custom_type`")
+
+add_my_test(
+    "slang type import typo suggest" slang compile test/fail/test_type_import_typo_fail)
+set_tests_properties("slang type import typo suggest"
+    PROPERTIES
+    WILL_FAIL TRUE
+    FIXTURES_REQUIRED needs_std
+    FAIL_REGULAR_EXPRESSION "did you mean `std::result`")
+
+add_my_test("slang func typo suggest" slang compile test/fail/test_func_typo_fail)
+set_tests_properties("slang func typo suggest"
+    PROPERTIES
+    WILL_FAIL TRUE
+    FAIL_REGULAR_EXPRESSION "did you mean `std::println`")
+
+add_my_test("slang redef suggest" slang compile test/fail/test_redef_fail)
+set_tests_properties("slang redef suggest"
+    PROPERTIES
+    WILL_FAIL TRUE
+    FAIL_REGULAR_EXPRESSION "rename one of the declarations")
+
+add_my_test("slang array init mismatch suggest" slang compile test/fail/test_array_init_mismatch)
+set_tests_properties("slang array init mismatch suggest"
+    PROPERTIES
+    WILL_FAIL TRUE
+    FAIL_REGULAR_EXPRESSION "all elements of an array initializer must have the same type")
 
 add_compile_exec_test("slang conversions" TRUE test/test_conversions)
 add_jit_compile_test("slang conversions" TRUE test/test_conversions)
@@ -336,6 +388,13 @@ add_compile_fail_test("slang macros fail 12" FALSE test/macros/test_fail12)
 add_compile_fail_test("slang macros format fail 1" TRUE test/macros/test_format_fail1)
 add_compile_fail_test("slang macros format fail 2" TRUE test/macros/test_format_fail2)
 add_compile_fail_test("slang macros format fail 3" TRUE test/macros/test_format_fail3)
+
+add_my_test("slang macros format spec d suggest" slang compile test/macros/test_format_spec_d)
+set_tests_properties("slang macros format spec d suggest"
+    PROPERTIES
+    WILL_FAIL TRUE
+    FIXTURES_REQUIRED needs_std
+    FAIL_REGULAR_EXPRESSION "the 'd' specifier expects an integer")
 
 add_compile_exec_test("slang macro import" TRUE test/macros/test_import --search-path test/macros)
 set_property(
@@ -411,6 +470,8 @@ add_jit_compile_test("slang strings" TRUE test/test_strings)
 
 add_compile_exec_test("slang structs" TRUE test/test_structs)
 add_jit_compile_test("slang structs" TRUE test/test_structs)
+
+add_compile_fail_test("slang struct init fail" FALSE test/test_struct_init_fail)
 
 add_compile_exec_test("slang struct import" TRUE test/test_struct_import)
 add_jit_compile_test("slang struct import" TRUE test/test_struct_import)
@@ -579,5 +640,15 @@ set_tests_properties("check formatting (examples)" PROPERTIES WORKING_DIRECTORY 
 add_test(NAME "check formatting (src)" COMMAND ${CMAKE_BINARY_DIR}/slang fmt --check src)
 set_tests_properties("check formatting (src)" PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..)
 
-add_test(NAME "check formatting (test)" COMMAND ${CMAKE_BINARY_DIR}/slang fmt --check test)
+file(GLOB_RECURSE TEST_FILES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/../test/*.sl"
+)
+
+# Exclude tests that are expected to fail parsing/formatting.
+list(FILTER TEST_FILES EXCLUDE REGEX "/test/fail/")
+
+add_test(
+    NAME "check formatting (test)"
+    COMMAND slang fmt --check ${TEST_FILES}
+)
 set_tests_properties("check formatting (test)" PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..)

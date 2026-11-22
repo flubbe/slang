@@ -15,6 +15,7 @@
 #include <string>
 #include <variant>
 
+#include "compiler/errors.h"
 #include "shared/token.h"
 #include "shared/token_stream.h"
 
@@ -22,11 +23,11 @@ namespace slang
 {
 
 /**
- * An error during lexing.
+ * An error during lexing, carrying the source location of the offending input.
  */
-class lexical_error : public std::runtime_error
+struct lexical_error : public source_error
 {
-    using std::runtime_error::runtime_error;
+    using source_error::source_error;
 };
 
 /** The lexer. Generates tokens from an input string. */

@@ -10,6 +10,8 @@
 
 #include <gtest/gtest.h>
 
+#include <ranges>
+
 #include "archives/memory.h"
 #include "compiler/lexer.h"
 #include "shared/token_stream.h"
@@ -48,11 +50,15 @@ TEST(token_stream, from_lexer)
         "let x: i32 = 42;")};
 
     EXPECT_FALSE(ts.empty());
-    EXPECT_EQ(ts.size(), 7);    // "let", "x", ":", "i32", "=", "42", ";"
+    EXPECT_EQ(ts.size(), 8);    // "let", "x", ":", "i32", "=", "42", ";", <eof>
     EXPECT_EQ(ts[0].s, "let");
     EXPECT_EQ(ts[1].s, "x");
+    EXPECT_EQ(ts[2].s, ":");
+    EXPECT_EQ(ts[3].s, "i32");
+    EXPECT_EQ(ts[4].s, "=");
     EXPECT_EQ(ts[5].s, "42");
     EXPECT_EQ(ts[6].s, ";");
+    EXPECT_EQ(ts[7].type, slang::token_type::eof);
 }
 
 TEST(token_stream, append)
@@ -113,13 +119,16 @@ TEST(token_stream, iteration)
       slang::lexer::lex(
         "a b c")};
 
+    ASSERT_EQ(ts.size(), 4);
+    EXPECT_EQ(ts.back().type, slang::token_type::eof);
+
     std::vector<std::string> names;
-    for(const auto& tok: ts)
+    for(const auto& tok: ts | std::views::take(ts.size() - 1))
     {
         names.push_back(tok.s);
     }
 
-    ASSERT_EQ(names.size(), 3);
+    ASSERT_EQ(names.size(), 3);    // automatic if ts.size() is 4.
     EXPECT_EQ(names[0], "a");
     EXPECT_EQ(names[1], "b");
     EXPECT_EQ(names[2], "c");

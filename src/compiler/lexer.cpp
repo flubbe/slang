@@ -200,17 +200,17 @@ std::optional<const_value> eval(
         catch(const std::invalid_argument&)
         {
             throw lexical_error{
+              loc,
               std::format(
-                "{}: Invalid argument for integer conversion: '{}'.",
-                to_string(loc),
+                "Invalid argument for integer conversion: '{}'.",
                 s)};
         }
         catch(const std::out_of_range& e)
         {
             throw lexical_error{
+              loc,
               std::format(
-                "{}: Argument out of range for integer conversion: '{}'.",
-                to_string(loc),
+                "Argument out of range for integer conversion: '{}'.",
                 s)};
         }
     }
@@ -223,17 +223,17 @@ std::optional<const_value> eval(
         catch(const std::invalid_argument& e)
         {
             throw lexical_error{
+              loc,
               std::format(
-                "{}: Invalid argument for floating point conversion: '{}'.",
-                to_string(loc),
+                "Invalid argument for floating point conversion: '{}'.",
                 s)};
         }
         catch(const std::out_of_range& e)
         {
             throw lexical_error{
+              loc,
               std::format(
-                "{}: Argument out of range for floating point conversion: '{}'.",
-                to_string(loc),
+                "Argument out of range for floating point conversion: '{}'.",
                 s)};
         }
     }
@@ -265,9 +265,9 @@ void validate_suffix(
     )
     {
         throw lexical_error{
+          loc,
           std::format(
-            "{}: Invalid width {} for integer type suffix. Valid widths are 8, 16, 32, 64.",
-            slang::to_string(loc),
+            "Invalid width {} for integer type suffix. Valid widths are 8, 16, 32, 64.",
             s.width)};
     }
 
@@ -276,9 +276,9 @@ void validate_suffix(
            && s.width != 64))    // NOLINT(readability-magic-numbers)
     {
         throw lexical_error{
+          loc,
           std::format(
-            "{}: Invalid width {} for floating point type suffix. Valid widths are 32, 64.",
-            slang::to_string(loc),
+            "Invalid width {} for floating point type suffix. Valid widths are 32, 64.",
             s.width)};
     }
 }
@@ -344,9 +344,8 @@ std::optional<token> lexer::next()
         }
 
         throw lexical_error{
-          std::format(
-            "{}: Missing terminating '*/' for block comment.",
-            to_string(get_location()))};
+          get_location(),
+          "Missing terminating '*/' for block comment."};
     };
 
     // collect whitespace/comments preceding the next token.
@@ -423,9 +422,9 @@ std::optional<token> lexer::next()
             if(!is_identifier(c, true))
             {
                 throw lexical_error{
+                  loc,
                   std::format(
-                    "{}: Expected identifier, got '{}'.",
-                    to_string(loc),
+                    "Expected identifier, got '{}'.",
                     c.value())};
             }
 
@@ -506,9 +505,9 @@ std::optional<token> lexer::next()
                    && utils::is_alpha(c.value()))
                 {
                     throw lexical_error{
+                      loc,
                       std::format(
-                        "{}: Expected non-alphabetic character, got '{}'.",
-                        to_string(loc),
+                        "Expected non-alphabetic character, got '{}'.",
                         c.value())};
                 }
 
@@ -588,9 +587,8 @@ std::optional<token> lexer::next()
                     }
 
                     throw lexical_error{
-                      std::format(
-                        "{}: Invalid numeric suffix: Unknown type identifier.",
-                        to_string(loc))};
+                      loc,
+                      "Invalid numeric suffix: Unknown type identifier."};
                 }();
 
                 if(c = peek();
@@ -598,9 +596,8 @@ std::optional<token> lexer::next()
                    || std::isdigit(c.value()) == 0)
                 {
                     throw lexical_error{
-                      std::format(
-                        "{}: Invalid numeric suffix: Expected width specifier.",
-                        to_string(loc))};
+                      loc,
+                      "Invalid numeric suffix: Expected width specifier."};
                 }
 
                 std::string width_specifier;
@@ -634,9 +631,9 @@ std::optional<token> lexer::next()
                    && c.value() != '.')
                 {
                     throw lexical_error{
+                      loc,
                       std::format(
-                        "{}: Expected '.', got '{}'.",
-                        to_string(loc),
+                        "Expected '.', got '{}'.",
                         c.value())};
                 }
 
@@ -670,9 +667,8 @@ std::optional<token> lexer::next()
                     if(c.value() == '\n')
                     {
                         throw lexical_error{
-                          std::format(
-                            "{}: Missing terminating character '\"'.",
-                            to_string(loc))};
+                          loc,
+                          "Missing terminating character '\"'."};
                     }
                 }
                 else
@@ -715,9 +711,9 @@ std::optional<token> lexer::next()
                     else
                     {
                         throw lexical_error{
+                          loc,
                           std::format(
-                            "{}: Unknown escape sequence '\\{}'.",
-                            to_string(loc),
+                            "Unknown escape sequence '\\{}'.",
                             c.value())};
                     }
                 }
@@ -728,9 +724,9 @@ std::optional<token> lexer::next()
                && utils::is_alpha(c.value()))
             {
                 throw lexical_error{
+                  loc,
                   std::format(
-                    "{}: Invalid suffix '{}' on string literal.",
-                    to_string(loc),
+                    "Invalid suffix '{}' on string literal.",
                     c.value())};
             }
 
@@ -755,12 +751,73 @@ std::optional<token> lexer::next()
             break;
         }
 
-        throw lexical_error{
+        auto err = lexical_error{
+          loc,
           std::format(
-            "{}: Unexpected character '{}' (0x{:x})",
-            to_string(loc),
+            "Unexpected character '{}' (0x{:02X})",
             c.value(),
-            static_cast<int>(c.value()))};
+            static_cast<int>(static_cast<unsigned char>(c.value()))),
+          std::string(1, c.value())};
+        err.with_label("unexpected character");
+
+        if(c.value() == '?')
+        {
+            err.with_help("did you mean `:` or `;`?");
+        }
+        else if(c.value() == '@')
+        {
+            err.did_you_mean = "#";
+        }
+        else if(c.value() == '\'' || c.value() == '`')
+        {
+            err.did_you_mean = "\"";
+        }
+        else if(c.value() == '\\')
+        {
+            err.did_you_mean = "/";
+        }
+        else
+        {
+            const auto uc = static_cast<unsigned char>(c.value());
+            if(uc == 0xCD
+               && peek().has_value()
+               && static_cast<unsigned char>(*peek()) == 0xBE)
+            {
+                get();
+                err.text = "\xCD\xBE";
+                err.with_help(
+                  "did you mean `;`? The Greek question mark (U+037E) "
+                  "resembles a semicolon.");
+            }
+            else if(uc == 0xEF
+                    && peek().has_value()
+                    && static_cast<unsigned char>(*peek()) == 0xBC)
+            {
+                get();
+                if(peek().has_value())
+                {
+                    char b3 = *get();
+                    const auto u3 = static_cast<unsigned char>(b3);
+                    if(u3 == 0x9B)
+                    {
+                        err.text = std::string{"\xEF\xBC\x9B", 3};
+                        err.did_you_mean = ";";
+                    }
+                    else if(u3 == 0x9A)
+                    {
+                        err.text = std::string{"\xEF\xBC\x9A", 3};
+                        err.did_you_mean = ":";
+                    }
+                    else if(u3 == 0x8C)
+                    {
+                        err.text = std::string{"\xEF\xBC\x8C", 3};
+                        err.did_you_mean = ",";
+                    }
+                }
+            }
+        }
+
+        throw err;
     }
 
     if(current_token.empty())
@@ -770,7 +827,8 @@ std::optional<token> lexer::next()
             return std::nullopt;
         }
         throw lexical_error{
-          "lext::next: No token parsed."};
+          get_location(),
+          "No token parsed."};
     }
 
     validate_suffix(loc, suffix);
@@ -841,6 +899,9 @@ token_stream lexer::lex(
     {
         tokens.push_back(current_token.value());
     }
+
+    tokens.push_back(
+      token::eof(lexer.location));
 
     return token_stream{
       std::move(tokens)};

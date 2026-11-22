@@ -4,7 +4,7 @@
  * in-memory archives.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -94,7 +94,7 @@ protected:
     {
         if(offset + bytes.size() > memory_buffer.size())
         {
-            throw std::runtime_error("memory_read_archive: read out of bounds.");
+            throw serialization_error("memory_read_archive: read out of bounds.");
         }
 
         std::copy(memory_buffer.begin() + offset, memory_buffer.begin() + offset + bytes.size(), bytes.begin());
@@ -136,7 +136,7 @@ public:
     {
         if(pos >= memory_buffer.size())
         {
-            throw std::runtime_error("memory_read_archive::seek: position out of bounds.");
+            throw serialization_error("memory_read_archive::seek: position out of bounds.");
         }
 
         offset = pos;

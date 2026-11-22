@@ -24,15 +24,6 @@ namespace slang::typing
 {
 
 /*
- * Exceptions.
- */
-
-type_error::type_error(const source_location& loc, const std::string& message)
-: std::runtime_error{std::format("{}: {}", to_string(loc), message)}
-{
-}
-
-/*
  * type_kind.
  */
 
@@ -44,7 +35,7 @@ std::string to_string(type_kind kind)
     case type_kind::array: return "array";
     case type_kind::struct_: return "struct";
     default:
-        throw std::runtime_error(
+        throw internal_error(
           std::format(
             "Cannot convert type kind {} to string.",
             std::to_underlying(kind)));
@@ -81,7 +72,7 @@ static std::string to_string(builtins b)
     case builtins::f64: return "f64";
     case builtins::str: return "str";
     default:
-        throw std::runtime_error(
+        throw internal_error(
           std::format(
             "Cannot convert builtin type {} to string.",
             std::to_underlying(b)));
@@ -112,7 +103,7 @@ type_id context::add_builtin(builtins builtin)
       });
     if(it != type_info_map.end())
     {
-        throw std::runtime_error(
+        throw internal_error(
           std::format(
             "Built-in type '{}' already defined.",
             ty::to_string(builtin)));
@@ -143,13 +134,13 @@ type_id context::declare_struct(
       });
     if(it != type_info_map.end())
     {
-        throw type_error(
+        throw internal_error{
           std::format(
             "Struct '{}' {} already defined.",
             name,
             qualified_name.has_value()
               ? std::format("({})", qualified_name.value())
-              : std::string{}));
+              : std::string{})};
     }
 
     std::size_t id = generate_type_id();
@@ -175,37 +166,37 @@ std::size_t context::add_field(
     auto it = type_info_map.find(struct_type_id);
     if(it == type_info_map.end())
     {
-        throw type_error(
+        throw internal_error{
           std::format(
             "No type with id '{}' found.",
-            struct_type_id));
+            struct_type_id)};
     }
 
     if(it->second.kind != type_kind::struct_)
     {
-        throw type_error(
+        throw internal_error{
           std::format(
             "Cannot add field to non-struct type '{}'.",
-            to_string(it->first)));
+            to_string(it->first))};
     }
 
     auto& info = std::get<struct_info>(it->second.data);
     if(info.is_sealed)
     {
-        throw type_error(
+        throw internal_error{
           std::format(
             "Cannot add field '{}' to struct '{}': Struct is sealed.",
             field_name,
-            info.name));
+            info.name)};
     }
 
     if(info.fields_by_name.contains(field_name))
     {
-        throw type_error(
+        throw internal_error{
           std::format(
             "Cannot add field '{}' to struct '{}': Field already exists.",
             field_name,
-            info.name));
+            info.name)};
     }
 
     std::size_t field_index = info.fields.size();
@@ -223,79 +214,64 @@ void context::seal_struct(type_id struct_type_id)
     auto it = type_info_map.find(struct_type_id);
     if(it == type_info_map.end())
     {
-        throw type_error(
+        throw internal_error{
           std::format(
             "No type with id '{}' found.",
-            struct_type_id));
+            struct_type_id)};
     }
 
     if(it->second.kind != type_kind::struct_)
     {
-        throw type_error(
+        throw internal_error{
           std::format(
             "Cannot seal non-struct type '{}'.",
-            to_string(it->first)));
+            to_string(it->first))};
     }
 
     auto& info = std::get<struct_info>(it->second.data);
     info.is_sealed = true;
 }
 
-struct_info& context::get_struct_info(type_id struct_type_id)
+struct_info* context::get_struct_info(type_id struct_type_id)
 {
     auto it = type_info_map.find(struct_type_id);
     if(it == type_info_map.end())
     {
-        throw type_error(
-          std::format(
-            "No type with id '{}' found.",
-            struct_type_id));
+        return nullptr;
     }
 
     if(it->second.kind != type_kind::struct_)
     {
-        throw type_error(
-          std::format(
-            "Cannot get field for non-struct type '{}'.",
-            to_string(it->first)));
+        return nullptr;
     }
 
-    return std::get<struct_info>(it->second.data);
+    return &std::get<struct_info>(it->second.data);
 }
 
-const struct_info& context::get_struct_info(type_id struct_type_id) const
+const struct_info* context::get_struct_info(type_id struct_type_id) const
 {
     auto it = type_info_map.find(struct_type_id);
     if(it == type_info_map.end())
     {
-        throw type_error(
-          std::format(
-            "No type with id '{}' found.",
-            struct_type_id));
+        return nullptr;
     }
 
     if(it->second.kind != type_kind::struct_)
     {
-        throw type_error(
-          std::format(
-            "Cannot get field for non-struct type '{}'.",
-            to_string(it->first)));
+        return nullptr;
     }
 
-    return std::get<struct_info>(it->second.data);
+    return &std::get<struct_info>(it->second.data);
 }
 
-type_id context::get_field_type(
+std::optional<type_id> context::get_field_type(
   type_id struct_type_id,
   std::size_t field_index) const
 {
     auto it = type_info_map.find(struct_type_id);
     if(it == type_info_map.end())
     {
-        throw type_error(
-          std::format(
-            "No type with id '{}' found.",
-            struct_type_id));
+        return std::nullopt;
     }
 
     // Special case: arrays.
@@ -307,44 +283,31 @@ type_id context::get_field_type(
             return get_i32_type();
         }
 
-        throw type_error(
-          std::format(
-            "Field index {} out of range (0-0).",
-            field_index));
+        return std::nullopt;
     }
 
     if(it->second.kind != type_kind::struct_)
     {
-        throw type_error(
-          std::format(
-            "Cannot get field for non-struct type '{}'.",
-            to_string(it->first)));
+        return std::nullopt;
     }
 
     const auto& info = std::get<struct_info>(it->second.data);
     if(field_index >= info.fields.size())
     {
-        throw type_error(
-          std::format(
-            "Field index {} out of range (0-{}).",
-            field_index,
-            info.fields.size()));
+        return std::nullopt;
     }
 
     return info.fields[field_index].type;
 }
 
-std::size_t context::get_field_index(
+std::optional<std::size_t> context::get_field_index(
   type_id struct_type_id,
   const std::string& name) const
 {
     auto it = type_info_map.find(struct_type_id);
     if(it == type_info_map.end())
     {
-        throw type_error(
-          std::format(
-            "No type with id '{}' found.",
-            struct_type_id));
+        return std::nullopt;
     }
 
     // Special case: arrays.
@@ -355,29 +318,19 @@ std::size_t context::get_field_index(
             return 0;
         }
 
-        throw type_error(
-          std::format(
-            "Unknown array property '{}'.",
-            name));
+        return std::nullopt;
     }
 
     if(it->second.kind != type_kind::struct_)
     {
-        throw type_error(
-          std::format(
-            "Cannot get field for non-struct type '{}'.",
-            to_string(it->first)));
+        return std::nullopt;
     }
 
     const auto& info = std::get<struct_info>(it->second.data);
     auto field_it = info.fields_by_name.find(name);
     if(field_it == info.fields_by_name.end())
     {
-        throw type_error(
-          std::format(
-            "No field '{}' found in struct '{}'.",
-            name,
-            info.name));
+        return std::nullopt;
     }
 
     return field_it->second;
@@ -396,7 +349,7 @@ bool context::has_type(const std::string& name) const
     return it != type_info_map.end();
 }
 
-type_id context::get_type(const std::string& name) const
+std::optional<type_id> context::get_type(const std::string& name) const
 {
     bool is_name_qualified = name.contains("::");
 
@@ -418,43 +371,81 @@ type_id context::get_type(const std::string& name) const
         return it->first;
     }
 
-    throw type_error(
-      std::format(
-        "Type '{}' not found.",
-        name));
+    return std::nullopt;
 }
 
-type_info context::get_type_info(type_id id) const
+std::vector<std::string> context::get_type_names() const
+{
+    std::vector<std::string> names;
+    names.reserve(type_info_map.size());
+
+    for(const auto& [id, info]: type_info_map)
+    {
+        if(info.kind == type_kind::builtin)
+        {
+            names.push_back(to_string(id));
+        }
+        else if(info.kind == type_kind::struct_)
+        {
+            const auto& s_info = std::get<struct_info>(info.data);
+            names.push_back(s_info.name);
+            if(s_info.qualified_name.has_value()
+               && s_info.qualified_name.value() != s_info.name)
+            {
+                names.push_back(s_info.qualified_name.value());
+            }
+        }
+    }
+
+    // Offer imported types as candidates too.
+    for(const auto& name: imported_type_names)
+    {
+        names.push_back(name);
+    }
+
+    std::ranges::sort(names);
+    auto [first, last] = std::ranges::unique(names);
+    names.erase(first, last);
+
+    return names;
+}
+
+type_error context::make_type_not_found_error(
+  source_location loc,
+  const std::string& name,
+  std::optional<std::string> text) const
+{
+    type_error err{
+      loc,
+      std::format("Type '{}' not found.", name),
+      text.has_value() ? text : name};
+    err.did_you_mean = diag::find_closest_match(name, get_type_names());
+    err.with_label("unknown type");
+    return err;
+}
+
+std::optional<type_info> context::get_type_info(type_id id) const
 {
     auto it = type_info_map.find(id);
     if(it == type_info_map.end())
     {
-        throw type_error(
-          std::format(
-            "Type with id '{}' not found.",
-            id));
+        return std::nullopt;
     }
 
     return it->second;
 }
 
-std::pair<bool, bool> context::get_type_flags(type_id id) const
+std::optional<std::pair<bool, bool>> context::get_type_flags(type_id id) const
 {
     auto it = type_info_map.find(id);
     if(it == type_info_map.end())
     {
-        throw type_error(
-          std::format(
-            "Type with id '{}' not found.",
-            id));
+        return std::nullopt;
     }
 
     if(it->second.kind != type_kind::struct_)
     {
-        throw type_error(
-          std::format(
-            "Cannot get flags for non-struct type '{}'.",
-            to_string(id)));
+        return std::nullopt;
     }
 
     return std::make_pair(
@@ -470,18 +461,18 @@ void context::set_type_flags(
     auto it = type_info_map.find(id);
     if(it == type_info_map.end())
     {
-        throw type_error(
+        throw internal_error{
           std::format(
             "Type with id '{}' not found.",
-            id));
+            id)};
     }
 
     if(it->second.kind != type_kind::struct_)
     {
-        throw type_error(
+        throw internal_error{
           std::format(
             "Cannot get flags for non-struct type '{}'.",
-            to_string(id)));
+            to_string(id))};
     }
 
     if(native.has_value())
@@ -495,15 +486,12 @@ void context::set_type_flags(
     }
 }
 
-type_id context::get_base_type(type_id id) const
+std::optional<type_id> context::get_base_type(type_id id) const
 {
     auto it = type_info_map.find(id);
     if(it == type_info_map.end())
     {
-        throw type_error(
-          std::format(
-            "Type with id {} not found in type map.",
-            id));
+        return std::nullopt;
     }
 
     if(it->second.kind != type_kind::array)
@@ -514,15 +502,12 @@ type_id context::get_base_type(type_id id) const
     return std::get<array_info>(it->second.data).element_type_id;
 }
 
-std::size_t context::get_array_rank(type_id id) const
+std::optional<std::size_t> context::get_array_rank(type_id id) const
 {
     auto it = type_info_map.find(id);
     if(it == type_info_map.end())
     {
-        throw type_error(
-          std::format(
-            "Type with id {} not found in type map.",
-            id));
+        return std::nullopt;
     }
 
     if(it->second.kind != type_kind::array)
@@ -538,27 +523,39 @@ bool context::has_expression_type(const ast::expression& expr) const
     return expression_types.contains(&expr);
 }
 
-void context::set_expression_type(const ast::expression& expr, std::optional<type_id> id)
+bool context::set_expression_type(const ast::expression& expr, std::optional<type_id> id)
 {
     if(expression_types.contains(&expr))
     {
         if(expression_types[&expr] != id)
         {
-            throw type_error(
-              expr.get_location(),
-              std::format(
-                "Could not set type: Expression type differs from last evaluation ('{}' != '{}').",
-                expression_types[&expr].has_value()
-                  ? to_string(expression_types[&expr].value())    // NOLINT(bugprone-unchecked-optional-access)
-                  : std::string{"<none>"},
-                id.has_value()
-                  ? to_string(id.value())
-                  : std::string{"<none>"}));
+            return false;
         }
     }
     else
     {
         expression_types[&expr] = id;
+    }
+    return true;
+}
+
+void context::set_expression_type_or_throw(
+  const ast::expression& expr,
+  std::optional<type_id> id)
+{
+    if(!set_expression_type(expr, id))
+    {
+        const auto& prev = expression_types[&expr];
+        throw internal_error{
+          expr.get_location(),
+          std::format(
+            "Could not set type: Expression type differs from last evaluation ('{}' != '{}').",
+            prev.has_value()
+              ? to_string(prev.value())
+              : std::string{"<none>"},
+            id.has_value()
+              ? to_string(id.value())
+              : std::string{"<none>"})};
     }
 }
 
@@ -567,7 +564,7 @@ std::optional<type_id> context::get_expression_type(const ast::expression& expr)
     auto it = expression_types.find(&expr);
     if(it == expression_types.end())
     {
-        throw type_error("Cannot get type for expression: Expression not known.");
+        return std::nullopt;
     }
 
     return it->second;
@@ -575,7 +572,13 @@ std::optional<type_id> context::get_expression_type(const ast::expression& expr)
 
 bool context::is_builtin(type_id id) const
 {
-    return get_type_info(id).kind == type_kind::builtin;
+    auto info = get_type_info(id);
+    if(!info.has_value())
+    {
+        return false;
+    }
+
+    return info.value().kind == type_kind::builtin;
 }
 
 bool context::is_nullable(type_id id) const
@@ -606,23 +609,13 @@ bool context::is_struct(type_id id) const
            && it->second.kind == type_kind::struct_;
 }
 
-type_id context::array_element_type(type_id id) const
+std::optional<type_id> context::array_element_type(type_id id) const
 {
     auto it = type_info_map.find(id);
-    if(it == type_info_map.end())
+    if(it == type_info_map.end()
+       || it->second.kind != type_kind::array)
     {
-        throw type_error(
-          std::format(
-            "Type with id '{}' not found in type map.",
-            id));
-    }
-
-    if(it->second.kind != type_kind::array)
-    {
-        throw type_error(
-          std::format(
-            "Type with id '{}' is not an array type.",
-            id));
+        return std::nullopt;
     }
 
     return std::get<array_info>(it->second.data).element_type_id;
@@ -640,28 +633,39 @@ bool context::are_types_compatible(type_id expected, type_id actual) const
         return is_nullable(expected);
     }
 
-    // check for sink types.
+    // Check for sink types.
     if(is_struct(expected) && is_reference(actual))
     {
         auto info = get_type_info(expected);
-        if(std::get<struct_info>(info.data).allow_cast)
+        if(!info)
         {
-            return true;
+            return false;
         }
+
+        return std::get<struct_info>(info->data).allow_cast;
     }
 
     return false;
 }
 
-type_id context::get_array(type_id id, std::size_t rank)
+std::optional<type_id> context::get_array(
+  type_id id,
+  std::size_t rank)
 {
     // normalize element id and rank.
     if(is_array(id))
     {
-        rank += get_array_rank(id);
-        id = get_base_type(id);
-    }
+        auto array_rank = get_array_rank(id);
+        auto base_type = get_base_type(id);
 
+        if(!array_rank || !base_type)
+        {
+            return std::nullopt;
+        }
+
+        rank += *array_rank;
+        id = *base_type;
+    }
     // check if the requested array type already exists.
     for(const auto& [existing_id, info]: type_info_map)
     {
@@ -696,16 +700,24 @@ std::string context::to_string(type_id id) const
     if(is_array(id))
     {
         rank = get_array_rank(id);
-        id = get_base_type(id);
+
+        auto base_type = get_base_type(id);
+        if(!base_type.has_value())
+        {
+            return std::format(
+              "<invalid type {}>",
+              id);
+        }
+
+        id = base_type.value();
     }
 
     auto it = type_info_map.find(id);
     if(it == type_info_map.end())
     {
-        throw type_error(
-          std::format(
-            "Type with id '{}' not found in type map.",
-            id));
+        return std::format(
+          "<invalid type {}>",
+          id);
     }
 
     std::string ret;
@@ -728,7 +740,7 @@ std::string context::to_string(type_id id) const
     }
     else
     {
-        throw std::runtime_error(
+        throw internal_error(
           std::format(
             "Unknown base type of kind {}",
             ::ty::to_string(it->second.kind)));

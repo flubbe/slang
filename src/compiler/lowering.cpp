@@ -4,7 +4,7 @@
  * type lowering context.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -49,10 +49,10 @@ const cg::type& context::lower(ty::type_id id)
     auto [insert_it, success] = type_cache.insert({id, cg::type{id, cg::type_kind::ref}});
     if(!success)
     {
-        throw cg::codegen_error(
+        throw internal_error{
           std::format(
             "Could not cache type for lowering: {}",
-            type_ctx.to_string(id)));
+            type_ctx.to_string(id))};
     }
 
     return insert_it->second;
@@ -67,21 +67,27 @@ cg::type context::deref(const cg::type& type)
 {
     if(!type.get_type_id().has_value())
     {
-        throw cg::codegen_error(
+        throw internal_error{
           std::format(
             "Could not deref type: Front-end type not set (back-end type is '{}')",
-            cg::to_string(type.get_type_kind())));
+            cg::to_string(type.get_type_kind()))};
     }
 
     if(!type_ctx.is_array(type.get_type_id().value()))
     {
-        throw cg::codegen_error(
+        // Type-check has established we're dereferencing an array type.
+        throw internal_error{
           std::format(
             "Could not deref non-array type '{}'.",
-            type_ctx.to_string(type.get_type_id().value())));
+            type_ctx.to_string(type.get_type_id().value()))};
     }
 
-    return lower(type_ctx.get_base_type(type.get_type_id().value()));
+    return lower(
+      ty::throw_or(
+        type_ctx.get_base_type(type.get_type_id().value()),
+        std::format(
+          "Could not get base type of type id '{}'.",
+          type.get_type_id().value())));
 }
 
 type_class context::get_type_class(const cg::type& type) const
@@ -91,8 +97,8 @@ type_class context::get_type_class(const cg::type& type) const
     switch(tk)
     {
     case cg::type_kind::void_:
-        throw cg::codegen_error(
-          "Type 'void' has no stack value.");
+        throw internal_error{
+          "Type 'void' has no stack value."};
     case cg::type_kind::i8:
     case cg::type_kind::i16:
     case cg::type_kind::i32:
@@ -113,7 +119,9 @@ std::string context::to_string() const
 
     for(const auto& [front_end_type, back_end_type]: type_cache)
     {
-        auto type_info = type_ctx.get_type_info(front_end_type);
+        auto type_info = ty::throw_or(
+          type_ctx.get_type_info(front_end_type),
+          std::format("Type with id '{}' not found.", front_end_type));
         if(type_info.kind != ty::type_kind::struct_)
         {
             continue;

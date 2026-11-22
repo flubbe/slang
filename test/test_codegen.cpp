@@ -721,10 +721,10 @@ public:
         auto it = sema_env.symbol_table.find(id);
         if(it == sema_env.symbol_table.end())
         {
-            throw std::runtime_error(
+            throw std::runtime_error{
               std::format(
                 "Symbol with id {} not found in symbol table.",
-                id.value));
+                id.value)};
         }
 
         return it->second.name;
@@ -742,7 +742,12 @@ public:
       std::size_t field_index) const override
     {
         auto info = type_ctx.get_struct_info(type_id);
-        return info.fields.at(field_index).name;
+        if(info == nullptr)
+        {
+            throw std::runtime_error{"Struct info not found."};
+        }
+
+        return info->fields.at(field_index).name;
     }
 
     [[nodiscard]]

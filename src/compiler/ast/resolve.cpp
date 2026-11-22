@@ -10,10 +10,13 @@
 
 #include "shared/module.h"
 #include "compiler/codegen/codegen.h"
+#include "compiler/diagnostics.h"
 #include "compiler/resolve.h"
 #include "compiler/typing.h"
 #include "ast.h"
 #include "utils.h"
+
+namespace diag = slang::compiler::diagnostics;
 
 namespace slang::ast
 {
@@ -83,13 +86,14 @@ void directive_expression::resolve_names(rs::context& ctx)
  * variable_reference_expression.
  */
 
-void variable_reference_expression::resolve_names(rs::context& ctx)
+void variable_reference_expression::resolve_names(
+  rs::context& ctx)
 {
     if(!scope_id.has_value())
     {
-        throw cg::codegen_error(
-          name.location,
-          "No scope information available.");
+        throw internal_error{
+          loc,
+          "No scope information available for variable reference."};
     }
 
     if(expansion)
@@ -130,11 +134,25 @@ void variable_reference_expression::resolve_names(rs::context& ctx)
 
     if(!symbol_id.has_value())
     {
-        throw cg::codegen_error(
-          name.location,
+        auto& d = ctx.get_diagnostics().report_error(
+          ctx.get_filename(),
+          diag::source_span{name},
           std::format(
-            "Could not resolve identifier '{}'.",
+            "unknown variable `{}`",
             get_qualified_name()));
+        d.with_label("unknown variable");
+
+        auto candidates = ctx.get_visible_symbol_names(scope_id.value(), sema::symbol_type::variable);
+        auto const_candidates = ctx.get_visible_symbol_names(scope_id.value(), sema::symbol_type::constant);
+        candidates.insert(candidates.end(), const_candidates.begin(), const_candidates.end());
+
+        if(auto hint = diag::find_closest_match(get_qualified_name(), candidates))
+        {
+            d.with_help(
+              std::format(
+                "did you mean `{}`?",
+                *hint));
+        }
     }
 }
 
@@ -233,9 +251,9 @@ void struct_named_initializer_expression::resolve_names(rs::context& ctx)
 {
     if(!scope_id.has_value())
     {
-        throw cg::codegen_error(
-          name.location,
-          "No scope information available.");
+        throw internal_error{
+          loc,
+          "No scope information available for struct initializer."};
     }
 
     const std::string qualified_name = get_qualified_name();
@@ -247,11 +265,22 @@ void struct_named_initializer_expression::resolve_names(rs::context& ctx)
       name.context);
     if(!symbol_id.has_value())
     {
-        throw cg::codegen_error(
-          name.location,
+        auto& d = ctx.get_diagnostics().report_error(
+          ctx.get_filename(),
+          diag::source_span{name},
           std::format(
-            "Could not resolve type '{}'.",
+            "unknown type `{}`",
             qualified_name));
+        d.with_label("unknown type");
+
+        auto candidates = ctx.get_visible_symbol_names(scope_id.value(), sema::symbol_type::type);
+        if(auto hint = diag::find_closest_match(qualified_name, candidates))
+        {
+            d.with_help(
+              std::format(
+                "did you mean `{}`?",
+                *hint));
+        }
     }
 
     std::ranges::for_each(
@@ -344,9 +373,9 @@ void call_expression::resolve_names(rs::context& ctx)
 {
     if(!scope_id.has_value())
     {
-        throw cg::codegen_error(
-          callee.location,
-          "No scope information available.");
+        throw internal_error{
+          loc,
+          "No scope information available for function call."};
     }
 
     const auto name = get_qualified_callee_name();
@@ -358,11 +387,22 @@ void call_expression::resolve_names(rs::context& ctx)
       callee.context);
     if(!symbol_id.has_value())
     {
-        throw cg::codegen_error(
-          callee.location,
+        auto& d = ctx.get_diagnostics().report_error(
+          ctx.get_filename(),
+          diag::source_span{callee},
           std::format(
-            "Could not resolve function '{}'.",
+            "unknown function `{}`",
             name));
+        d.with_label("unknown function");
+
+        auto candidates = ctx.get_visible_symbol_names(scope_id.value(), sema::symbol_type::function);
+        if(auto hint = diag::find_closest_match(name, candidates))
+        {
+            d.with_help(
+              std::format(
+                "did you mean `{}`?",
+                *hint));
+        }
     }
 
     std::ranges::for_each(
@@ -386,9 +426,9 @@ void macro_invocation::resolve_names(rs::context& ctx)
 {
     if(!scope_id.has_value())
     {
-        throw cg::codegen_error(
-          name.location,
-          "No scope information available.");
+        throw internal_error{
+          loc,
+          "No scope information available for macro invocation."};
     }
 
     const auto qualified_name = get_qualified_callee_name();
@@ -400,11 +440,22 @@ void macro_invocation::resolve_names(rs::context& ctx)
       name.context);
     if(!symbol_id.has_value())
     {
-        throw cg::codegen_error(
-          name.location,
+        auto& d = ctx.get_diagnostics().report_error(
+          ctx.get_filename(),
+          diag::source_span{name},
           std::format(
-            "Could not resolve macro '{}'.",
+            "unknown macro `{}`",
             qualified_name));
+        d.with_label("unknown macro");
+
+        auto candidates = ctx.get_visible_symbol_names(scope_id.value(), sema::symbol_type::macro);
+        if(auto hint = diag::find_closest_match(qualified_name, candidates))
+        {
+            d.with_help(
+              std::format(
+                "did you mean `{}`?",
+                *hint));
+        }
     }
 
     std::ranges::for_each(

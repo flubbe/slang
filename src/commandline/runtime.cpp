@@ -4,7 +4,7 @@
  * Runtime setup for commandline tools.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -28,14 +28,14 @@ void runtime_setup(si::context& ctx, bool verbose)
 {
     if(verbose)
     {
-        std::println("Info: Registering type layouts.");
+        std::println(stderr, "Info: Registering type layouts.");
     }
 
     rt::register_builtin_type_layouts(ctx.get_gc());
 
     if(verbose)
     {
-        std::println("Info: Registering native functions.");
+        std::println(stderr, "Info: Registering native functions.");
     }
 
     ctx.register_native_function(

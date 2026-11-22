@@ -4,7 +4,7 @@
  * interpreter.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -22,7 +22,7 @@
 
 #ifdef INTERPRETER_DEBUG
 #    include <print>
-#    define DEBUG_LOG(...) std::println("INT: {}", std::format(__VA_ARGS__))
+#    define DEBUG_LOG(...) std::println(stderr, "INT: {}", std::format(__VA_ARGS__))
 #else
 #    define DEBUG_LOG(...)
 #endif

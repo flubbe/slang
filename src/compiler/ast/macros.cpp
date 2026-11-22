@@ -50,6 +50,8 @@ std::unique_ptr<block> parse_macro_rule_body(const macro_rule& branch)
     tokens.insert(tokens.end(), body->data().begin(), body->data().end());
     tokens.push_back(closing.value());
 
+    append_eof(tokens);
+
     return parser::parse_block_expression(token_stream{std::move(tokens)});
 }
 
@@ -89,6 +91,9 @@ bool expression::expand_macros(
           syntax_contexts,
           expr->get_location(),
           expr->get_argument_separators());
+
+        append_eof(expanded_tokens);
+
         expr->set_expansion(
           parser::parse_block_expression(std::move(expanded_tokens)));
         return true;
@@ -161,6 +166,15 @@ bool expression::expand_macros(
             auto* descriptor_macro = macro_env.get_macro(
               macro_expr->get_name(),
               std::nullopt);
+            if(descriptor_macro == nullptr)
+            {
+                throw macro::macro_error{
+                  macro_expr->get_location(),
+                  std::format(
+                    "Macro '{}' not found.",
+                    macro_expr->get_name())};
+            }
+
             if(!expand_token_macro(descriptor_macro, macro_expr))
             {
                 throw cg::codegen_error(
@@ -185,6 +199,15 @@ bool expression::expand_macros(
             auto* m = macro_env.get_macro(
               macro_expr->get_name(),
               macro_expr->get_namespace_path());
+            if(m == nullptr)
+            {
+                throw macro::macro_error{
+                  macro_expr->get_location(),
+                  std::format(
+                    "Macro '{}::{}' not found.",
+                    macro_expr->get_namespace_path().value(),
+                    macro_expr->get_name())};
+            }
 
             if(!expand_token_macro(m, macro_expr))
             {
@@ -401,30 +424,32 @@ std::optional<ty::type_id> macro_invocation::type_check(
     {
         if(!return_type.has_value())
         {
-            throw ty::type_error(
+            throw internal_error{
               index_expr->get_location(),
-              "Indexing into expression without type.");
+              "Indexing into expression without type."};
         }
 
         auto v = index_expr->type_check(ctx, env);
         if(!v.has_value())
         {
-            throw ty::type_error(
+            throw internal_error{
               index_expr->get_location(),
-              "Index expression has no type.");
+              "Index expression has no type."};
         }
         if(!ctx.are_types_compatible(ctx.get_i32_type(), v.value()))
         {
-            throw ty::type_error(
+            throw ty::type_error{
               loc,
               std::format(
                 "Expected <integer> for array element access, got '{}'.",
-                ctx.to_string(v.value())));
+                ctx.to_string(v.value()))};
         }
 
         if(!ctx.is_array(return_type.value()))
         {
-            throw ty::type_error(loc, "Cannot use subscript on non-array type.");
+            throw ty::type_error{
+              loc,
+              "Cannot use subscript on non-array type."};
         }
 
         expr_type = ctx.array_element_type(return_type.value());
@@ -434,7 +459,7 @@ std::optional<ty::type_id> macro_invocation::type_check(
         expr_type = return_type;
     }
 
-    ctx.set_expression_type(*this, expr_type);
+    ctx.set_expression_type_or_throw(*this, expr_type);
 
     return expr_type;
 }
@@ -682,11 +707,11 @@ std::optional<ty::type_id> macro_expression::type_check(
             namespace_path = e.get_namespace_path();
             if(!namespace_path.has_value())
             {
-                throw ty::type_error(
+                throw internal_error{
                   loc,
                   std::format(
                     "Unable to get namespace in macro expansion at {}.",
-                    ::slang::to_string(e.get_location())));
+                    ::slang::to_string(e.get_location()))};
             }
 
             auto module_id = env.get_symbol_id(
@@ -695,11 +720,11 @@ std::optional<ty::type_id> macro_expression::type_check(
               env.global_scope_id);
             if(!module_id.has_value())
             {
-                throw ty::type_error(
+                throw internal_error{
                   loc,
                   std::format(
                     "Unresolved import '{}',",
-                    namespace_path.value()));
+                    namespace_path.value())};
             }
 
             if(!env.transitive_imports.contains(module_id.value()))
@@ -716,11 +741,11 @@ std::optional<ty::type_id> macro_expression::type_check(
                      scope_id.value())
                   .has_value())
             {
-                throw ty::type_error(
+                throw internal_error{
                   e.get_location(),
                   std::format(
                     "Unresolved symbol '{}'.",
-                    e.as_call_expression()->get_qualified_callee_name()));
+                    e.as_call_expression()->get_qualified_callee_name())};
             }
         }
         else if(e.is_macro_invocation())
@@ -731,11 +756,11 @@ std::optional<ty::type_id> macro_expression::type_check(
                      scope_id.value())
                   .has_value())
             {
-                throw ty::type_error(
+                throw internal_error{
                   loc,
                   std::format(
                     "Unresolved symbol '{}',",
-                    e.as_macro_invocation()->get_qualified_name()));
+                    e.as_macro_invocation()->get_qualified_name())};
             }
         }
     };
@@ -767,11 +792,11 @@ void macro_expression::collect_macro(sema::env& sema_env, macro::env& macro_env)
 {
     if(!symbol_id.has_value())
     {
-        throw std::runtime_error(
+        throw internal_error{
+          get_location(),
           std::format(
-            "{}: Macro '{}' has no symbol id.",
-            ::slang::to_string(get_location()),
-            get_qualified_name()));
+            "Macro '{}' has no symbol id.",
+            get_qualified_name())};
     }
 
     std::vector<std::pair<std::string, module_::directive_descriptor>> attributes;
@@ -790,9 +815,9 @@ void macro_expression::collect_macro(sema::env& sema_env, macro::env& macro_env)
                            }
 
                            throw attribs::attribute_error(
+                             info.loc,
                              std::format(
-                               "{}: Attribute '{}' invalid for macro expressions.",
-                               ::slang::to_string(info.loc),
+                               "Attribute '{}' invalid for macro expressions.",
                                attribs::to_string(info.kind)));
                        })
                      | std::ranges::to<std::vector>();

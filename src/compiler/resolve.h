@@ -10,6 +10,8 @@
 
 #pragma once
 
+#include "compiler/diagnostics.h"
+#include "compiler/errors.h"
 #include "constant.h"
 #include "macro.h"
 #include "sema.h"
@@ -27,8 +29,16 @@ namespace slang::resolve
 {
 
 namespace const_ = slang::const_;
+namespace diag = slang::compiler::diagnostics;
 namespace ld = slang::loader;
 namespace ty = slang::typing;
+
+/** Return a default, fallback diagnostic context for contexts where none is explicitly provided. */
+inline diag::context& default_diagnostics()
+{
+    static thread_local diag::context fallback;
+    return fallback;
+}
 
 /** Module id. */
 using module_id = std::uint64_t;
@@ -41,6 +51,12 @@ struct import_module_spec
 
     /** Source location of the import. */
     source_location location;
+};
+
+/** Import resolution failure. */
+struct import_error : public source_error
+{
+    using source_error::source_error;
 };
 
 /** Name resolution context. */
@@ -57,6 +73,13 @@ class context
 
     /** Type context. */
     ty::context& type_ctx;
+
+    /** Diagnostic context reference. */
+    diag::context& diags;
+
+    /** Filename of the currently compiled file. */
+    // FIXME Should this be solved differently? (used for diagnostics reporting)
+    std::string filename;
 
     /** Module map (map `qualified_name -> module_id`). */
     std::unordered_map<std::string, module_id> module_map;
@@ -107,9 +130,9 @@ class context
      *
      * @param t The type to resolve.
      * @param module_name The module name of the type reference.
-     * @returns Returns the type id of the resolved type.
+     * @returns Returns the resolved type id, or `std::nullopt` if resolution failed.
      */
-    ty::type_id resolve_imported_type(
+    std::optional<ty::type_id> resolve_imported_type(
       const module_::variable_type& t,
       const std::string& module_name);
 
@@ -173,16 +196,22 @@ public:
      * @param const_env The constant environment.
      * @param macro_env The macro environment.
      * @param type_ctx The type context.
+     * @param diags Diagnostics context.
+     * @param filename Name of the current file.
      */
     context(
       sema::env& sema_env,
       const_::env& const_env,
       macro::env& macro_env,
-      ty::context& type_ctx)
+      ty::context& type_ctx,
+      diag::context& diags = default_diagnostics(),
+      std::string filename = "")
     : sema_env{sema_env}
     , const_env{const_env}
     , macro_env{macro_env}
     , type_ctx{type_ctx}
+    , diags{diags}
+    , filename{std::move(filename)}
     {
     }
 
@@ -192,6 +221,70 @@ public:
     /** Deleted assignments. */
     context& operator=(const context&) = delete;
     context& operator=(context&&) = delete;
+
+    /** Return diagnostics context. */
+    [[nodiscard]]
+    diag::context& get_diagnostics() const
+    {
+        return diags;
+    }
+
+    /** Set current filename. */
+    void set_filename(std::string file)
+    {
+        filename = std::move(file);
+    }
+
+    /** Return current filename. */
+    [[nodiscard]]
+    const std::string& get_filename() const
+    {
+        return filename;
+    }
+
+    /** Return visible symbol names for suggestions. */
+    [[nodiscard]] std::vector<std::string> get_visible_symbol_names(
+      sema::scope_id scope_id,
+      std::optional<sema::symbol_type> type = std::nullopt) const
+    {
+        auto names = sema_env.get_visible_symbol_names(scope_id, type);
+
+        // Also include symbols visible through imported modules, so that a
+        // misspelled imported name is offered as a candidate. The symbol is
+        // listed under its qualified name (e.g. `std::println`), which is how
+        // imported symbols are written in source -- this also lets a mistyped
+        // namespace (`sttd::println`) match the closest imported symbol.
+        for(const auto& [mid, module_env]: module_envs)
+        {
+            for(const auto& [sym_id, info]: module_env.symbol_table)
+            {
+                if(type.has_value() && info.type != *type)
+                {
+                    continue;
+                }
+
+                names.push_back(
+                  info.qualified_name.empty() ? info.name
+                                              : info.qualified_name);
+            }
+        }
+
+        if(!type.has_value()
+           || type == sema::symbol_type::type)
+        {
+            auto type_names = type_ctx.get_type_names();
+            names.insert(
+              names.end(),
+              type_names.begin(),
+              type_names.end());
+        }
+
+        std::ranges::sort(names);
+        auto [first, last] = std::ranges::unique(names);
+        names.erase(first, last);
+
+        return names;
+    }
 
     /**
      * Resolve a symbol.

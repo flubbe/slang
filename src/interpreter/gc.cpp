@@ -4,7 +4,7 @@
  * garbage collector.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -18,7 +18,7 @@
 
 #ifdef GC_DEBUG
 #    include <print>
-#    define GC_LOG(...) std::println("GC: {}", std::format(__VA_ARGS__))
+#    define GC_LOG(...) std::println(stderr, "GC: {}", std::format(__VA_ARGS__))
 #else
 #    define GC_LOG(...)
 #endif

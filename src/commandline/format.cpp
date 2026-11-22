@@ -277,12 +277,12 @@ void fmt::invoke(
 
         if(check_only)
         {
-            std::println("Would reformat: {}", file.string());
+            std::println(stderr, "Would reformat: {}", file.string());
             continue;
         }
 
         write_file(file_mgr, file, formatted);
-        std::println("Reformatted: {}", file.string());
+        std::println(stderr, "Reformatted: {}", file.string());
     }
 
     if(check_only && changed_count > 0)

@@ -4,7 +4,7 @@
  * Attributes.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -16,6 +16,7 @@
 #include <variant>
 
 #include "shared/location.h"
+#include "errors.h"
 
 namespace slang::attribs
 {
@@ -23,9 +24,9 @@ namespace slang::attribs
 using slang::source_location;
 
 /** Attribute error. */
-class attribute_error : public std::runtime_error
+struct attribute_error : public source_error
 {
-    using std::runtime_error::runtime_error;
+    using source_error::source_error;
 };
 
 /** Attribute kind. */
