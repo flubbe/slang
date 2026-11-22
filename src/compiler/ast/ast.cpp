@@ -4307,7 +4307,6 @@ std::optional<ty::type_id> binary_expression::type_check(
 
     if(op.s == ".")    // struct access
     {
-        // TODO change or improve error message.
         throw internal_error{
           loc,
           "Struct access is not handled by binary_expression"};
@@ -5537,7 +5536,7 @@ void function_expression::generate_code(
         {
             throw internal_error{
               loc,
-              "Internal error: Break-continue stack is not empty."};
+              "Break-continue stack is not empty."};
         }
 
         auto* ip = ctx.get_insertion_point();

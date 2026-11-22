@@ -86,15 +86,14 @@ void directive_expression::resolve_names(rs::context& ctx)
  * variable_reference_expression.
  */
 
-void variable_reference_expression::resolve_names(rs::context& ctx)
+void variable_reference_expression::resolve_names(
+  rs::context& ctx)
 {
     if(!scope_id.has_value())
     {
-        ctx.get_diagnostics().report_error(
-          ctx.get_filename(),
-          diag::source_span{name},
-          "Internal error: No scope information available for variable reference.");
-        return;
+        throw internal_error{
+          loc,
+          "No scope information available for variable reference."};
     }
 
     if(expansion)
@@ -252,11 +251,9 @@ void struct_named_initializer_expression::resolve_names(rs::context& ctx)
 {
     if(!scope_id.has_value())
     {
-        ctx.get_diagnostics().report_error(
-          ctx.get_filename(),
-          diag::source_span{name},
-          "Internal error: No scope information available for struct initializer.");
-        return;
+        throw internal_error{
+          loc,
+          "No scope information available for struct initializer."};
     }
 
     const std::string qualified_name = get_qualified_name();
@@ -376,11 +373,9 @@ void call_expression::resolve_names(rs::context& ctx)
 {
     if(!scope_id.has_value())
     {
-        ctx.get_diagnostics().report_error(
-          ctx.get_filename(),
-          diag::source_span{callee},
-          "Internal error: No scope information available for function call.");
-        return;
+        throw internal_error{
+          loc,
+          "No scope information available for function call."};
     }
 
     const auto name = get_qualified_callee_name();
@@ -431,11 +426,9 @@ void macro_invocation::resolve_names(rs::context& ctx)
 {
     if(!scope_id.has_value())
     {
-        ctx.get_diagnostics().report_error(
-          ctx.get_filename(),
-          diag::source_span{name},
-          "Internal error: No scope information available for macro invocation.");
-        return;
+        throw internal_error{
+          loc,
+          "No scope information available for macro invocation."};
     }
 
     const auto qualified_name = get_qualified_callee_name();
