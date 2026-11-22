@@ -232,7 +232,10 @@ std::unique_ptr<cg::rvalue> expression::try_emit_const_eval_result(
             return std::make_unique<cg::rvalue>(back_end_type);
         }
 
+        // TODO diagnostics
+
         std::println(
+          stderr,
           "{}: Warning: Attempted constant expression computation failed.",
           slang::to_string(loc));
     }
@@ -845,7 +848,10 @@ std::optional<ty::type_id> literal_expression::type_check(
                    && v != 0.0
                    && std::isfinite(v))
                 {
+                    // TODO diagnostics
+
                     std::println(
+                      stderr,
                       "{}: Warning: Floating point literal '{}' underflows to 0.0 in f32.",
                       slang::to_string(loc),
                       tok.s);
@@ -5324,7 +5330,12 @@ void block::generate_code(
     {
         if(expr->is_pure(ctx))
         {
-            std::println("{}: Expression has no effect.", slang::to_string(expr->get_location()));
+            // TODO diagnostics.
+
+            std::println(
+              stderr,
+              "{}: Expression has no effect.",
+              slang::to_string(expr->get_location()));
 
             // don't generate code.
             continue;
@@ -5357,7 +5368,10 @@ std::unique_ptr<cg::rvalue> block::emit_rvalue(
 
         if(expr->is_pure(ctx))
         {
+            // TODO diagnostics
+
             std::println(
+              stderr,
               "{}: Expression has no effect.",
               slang::to_string(expr->get_location()));
             continue;

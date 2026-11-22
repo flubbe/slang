@@ -96,7 +96,7 @@ void compile::invoke(const std::vector<std::string>& args)
 
         if(verbose)
         {
-            std::println("Info: Module path: {}", module_path.string());
+            std::println(stderr, "Info: Module path: {}", module_path.string());
         }
 
         // generate output file name, if necessary.
@@ -107,7 +107,7 @@ void compile::invoke(const std::vector<std::string>& args)
 
             if(verbose)
             {
-                std::println("Info: Output file: {}", output_file.string());
+                std::println(stderr, "Info: Output file: {}", output_file.string());
             }
         }
     }
@@ -126,11 +126,11 @@ void compile::invoke(const std::vector<std::string>& args)
     {
         if(!evaluate_constant_subexpressions)
         {
-            std::println("Info: Evaluation of constant subexpressions disabled.");
+            std::println(stderr, "Info: Evaluation of constant subexpressions disabled.");
         }
         else
         {
-            std::println("Info: Evaluation of constant subexpressions enabled (default).");
+            std::println(stderr, "Info: Evaluation of constant subexpressions enabled (default).");
         }
     }
 
@@ -144,7 +144,7 @@ void compile::invoke(const std::vector<std::string>& args)
     {
         if(verbose)
         {
-            std::println("Info: Adding 'lang' to search paths.");
+            std::println(stderr, "Info: Adding 'lang' to search paths.");
         }
 
         file_mgr.add_search_path("lang");
@@ -157,7 +157,7 @@ void compile::invoke(const std::vector<std::string>& args)
         {
             if(verbose)
             {
-                std::println("Info: Adding '{}' to search paths.", it);
+                std::println(stderr, "Info: Adding '{}' to search paths.", it);
             }
 
             file_mgr.add_search_path(it);
@@ -182,7 +182,7 @@ void compile::invoke(const std::vector<std::string>& args)
         std::size_t input_size = input_ar->size();
         if(input_size == 0)
         {
-            std::println("Empty input.");
+            std::println(stderr, "Empty input.");
             return;
         }
 
@@ -210,10 +210,9 @@ void compile::invoke(const std::vector<std::string>& args)
         parser.parse(std::move(tokens));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        if(!ast)
+        if(ast == nullptr)
         {
-            std::println("No AST produced.");
-            return;
+            throw internal_error{"No AST produced."};
         }
 
         ld::context loader_ctx{file_mgr};
@@ -292,7 +291,7 @@ void compile::invoke(const std::vector<std::string>& args)
         {
             if(verbose)
             {
-                std::println("Info: Running CFG simplification.");
+                std::println(stderr, "Info: Running CFG simplification.");
             }
 
             cfg_context.run();
@@ -300,7 +299,7 @@ void compile::invoke(const std::vector<std::string>& args)
         }
         else if(verbose)
         {
-            std::println("Info: Not running CFG simplification.");
+            std::println(stderr, "Info: Not running CFG simplification.");
         }
 
         emitter.run();
@@ -314,7 +313,7 @@ void compile::invoke(const std::vector<std::string>& args)
             diag_ctx.emit_all(stderr, true);
         }
 
-        std::println("Compilation finished. Output file: {}", output_file.string());
+        std::println(stderr, "Compilation finished. Output file: {}", output_file.string());
     }
     catch(const diag::diagnostic_error&)
     {

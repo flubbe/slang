@@ -4,7 +4,7 @@
  * `run` command implementation.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -59,7 +59,7 @@ static void validate_main_signature(
 {
     if(verbose)
     {
-        std::println("Info: Validating signature of 'main'.");
+        std::println(stderr, "Info: Validating signature of 'main'.");
     }
 
     // validate function signature for 'main'.
@@ -95,22 +95,22 @@ static void finalize_gc(gc::garbage_collector& gc, bool verbose)
 {
     if(verbose)
     {
-        std::println("Info: Finalizing GC.");
+        std::println(stderr, "Info: Finalizing GC.");
     }
 
     gc.run();
 
     if(gc.object_count() != 0)
     {
-        std::println("GC warning: Object count is {}.", gc.object_count());
+        std::println(stderr, "GC warning: Object count is {}.", gc.object_count());
     }
     if(gc.root_set_size() != 0)
     {
-        std::println("GC warning: Root set size is {}.", gc.root_set_size());
+        std::println(stderr, "GC warning: Root set size is {}.", gc.root_set_size());
     }
     if(gc.byte_size() != 0)
     {
-        std::println("GC warning: {} bytes still allocated.", gc.byte_size());
+        std::println(stderr, "GC warning: {} bytes still allocated.", gc.byte_size());
     }
 }
 
@@ -166,7 +166,7 @@ void run::invoke(const std::vector<std::string>& args)
     {
         if(verbose)
         {
-            std::println("Info: Adding 'lang' to search paths.");
+            std::println(stderr, "Info: Adding 'lang' to search paths.");
         }
 
         file_mgr.add_search_path("lang");
@@ -180,7 +180,7 @@ void run::invoke(const std::vector<std::string>& args)
         {
             if(verbose)
             {
-                std::println("Info: Adding '{}' to search paths.", it);
+                std::println(stderr, "Info: Adding '{}' to search paths.", it);
             }
 
             file_mgr.add_search_path(it);
@@ -213,7 +213,7 @@ void run::invoke(const std::vector<std::string>& args)
 
     if(verbose)
     {
-        std::println("Info: module name: {}", module_name.string());
+        std::println(stderr, "Info: module name: {}", module_name.string());
     }
 
     /*
@@ -237,7 +237,7 @@ void run::invoke(const std::vector<std::string>& args)
         // call 'main'.
         if(verbose)
         {
-            std::println("Info: Invoking 'main'.");
+            std::println(stderr, "Info: Invoking 'main'.");
         }
         si::value res = si::invoke(
           main_function,
@@ -247,13 +247,13 @@ void run::invoke(const std::vector<std::string>& args)
 
         if(return_value == nullptr)
         {
-            std::println();
-            std::println("Program did not return a valid exit code.");
+            std::println(stderr);
+            std::println(stderr, "Program did not return a valid exit code.");
         }
         else
         {
-            std::println();
-            std::println("Program exited with exit code {}.", *return_value);
+            std::println(stderr);
+            std::println(stderr, "Program exited with exit code {}.", *return_value);
         }
 
         finalize_gc(ctx.get_gc(), verbose);
@@ -284,6 +284,7 @@ void run::invoke(const std::vector<std::string>& args)
                 time_load_compile_end - time_load_compile_start)
                 .count();
             std::println(
+              stderr,
               "Info: Loaded and compiled modules in {:.2f} ms.",
               load_compile_duration);
         }
@@ -345,8 +346,8 @@ void run::invoke(const std::vector<std::string>& args)
           frame.stack.span().data(),
           sizeof(return_value));
 
-        std::println();
-        std::println("Program exited with exit code {}.", return_value);
+        std::println(stderr);
+        std::println(stderr, "Program exited with exit code {}.", return_value);
 
         // Finalize GC.
         frame.clear_gc_local_roots();

@@ -4,7 +4,7 @@
  * Program entry point.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -90,9 +90,9 @@ int main(int argc, char* argv[])
 
         if(result.count("command") < 1)
         {
-            std::print("{}", options.help());
-            std::print("Positional arguments:\n\n");
-            std::print("{}\n\n", command_help());
+            std::print(stderr, "{}", options.help());
+            std::print(stderr, "Positional arguments:\n\n");
+            std::print(stderr, "{}\n\n", command_help());
             return EXIT_SUCCESS;
         }
 
@@ -109,11 +109,11 @@ int main(int argc, char* argv[])
             return EXIT_SUCCESS;
         }
 
-        std::print("{}", options.help());
-        std::print("Positional arguments:\n\n");
-        std::print("{}\n\n", command_help());
+        std::print(stderr, "{}", options.help());
+        std::print(stderr, "Positional arguments:\n\n");
+        std::print(stderr, "{}\n\n", command_help());
 
-        std::print("Error: Command '{}' not found.\n\n", args[0]);
+        std::print(stderr, "Error: Command '{}' not found.\n\n", args[0]);
 
         return EXIT_FAILURE;
     }
@@ -121,28 +121,28 @@ int main(int argc, char* argv[])
     {
         if(std::string_view{e.what()}.size() > 0)
         {
-            std::println("{}", e.what());
+            std::println(stderr, "{}", e.what());
         }
         return EXIT_FAILURE;
     }
     catch(const std::runtime_error& e)
     {
-        std::println("An error occured: {}", e.what());
+        std::println(stderr, "An error occured: {}", e.what());
         return EXIT_FAILURE;
     }
     catch(const cxxopts::exceptions::exception& e)
     {
-        std::println("{}", e.what());
+        std::println(stderr, "{}", e.what());
         return EXIT_FAILURE;
     }
     catch(const std::exception& e)
     {
-        std::println("An error occured: {}", e.what());
+        std::println(stderr, "An error occured: {}", e.what());
         return EXIT_FAILURE;
     }
     catch(...)
     {
-        std::println("The program unexpectedly crashed.");
+        std::println(stderr, "The program unexpectedly crashed.");
         return EXIT_FAILURE;
     }
 }
