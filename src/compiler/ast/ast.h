@@ -22,6 +22,7 @@
 #include "compiler/collect.h"
 #include "compiler/constant.h"
 #include "compiler/directive.h"
+#include "compiler/errors.h"
 #include "compiler/typing.h"
 #include "shared/token_stream.h"
 #include "node_ids.h"
@@ -134,7 +135,7 @@ public:
     /**
      * Get the expression as a variable declaration.
      *
-     * @throws Throws a `std::runtime_error` if the expression is not a variable declaration.
+     * @throws Throws a `internal_error` if the expression is not a variable declaration.
      */
     [[nodiscard]]
     virtual class variable_declaration_expression* as_variable_declaration();
@@ -149,7 +150,7 @@ public:
     /**
      * Get the expression as a constant declaration.
      *
-     * @throws Throws a `std::runtime_error` if the expression is not a constant declaration.
+     * @throws Throws a `internal_error` if the expression is not a constant declaration.
      */
     [[nodiscard]]
     virtual class constant_declaration_expression* as_constant_declaration();
@@ -157,7 +158,7 @@ public:
     /**
      * Get the expression as a constant declaration.
      *
-     * @throws Throws a `std::runtime_error` if the expression is not a constant declaration.
+     * @throws Throws a `internal_error` if the expression is not a constant declaration.
      */
     [[nodiscard]]
     virtual const class constant_declaration_expression* as_constant_declaration() const;
@@ -172,7 +173,7 @@ public:
     /**
      * Get the expression as a variable reference.
      *
-     * @throws Throws a `std::runtime_error` if the expression is not a variable reference.
+     * @throws Throws a `internal_error` if the expression is not a variable reference.
      */
     [[nodiscard]]
     virtual class variable_reference_expression* as_variable_reference();
@@ -201,7 +202,7 @@ public:
     /**
      * Get the expression as a call expression.
      *
-     * @throws Throws a `std::runtime_error` if the expression is not a call expression.
+     * @throws Throws a `internal_error` if the expression is not a call expression.
      */
     virtual class call_expression* as_call_expression();
 
@@ -215,7 +216,7 @@ public:
     /**
      * Get the expression as a macro expression.
      *
-     * @throws Throws a `std::runtime_error` if the expression is not a macro expression.
+     * @throws Throws a `internal_error` if the expression is not a macro expression.
      */
     virtual class macro_expression* as_macro_expression();
 
@@ -229,7 +230,7 @@ public:
     /**
      * Get the expression as a macro rule.
      *
-     * @throws Throws a `std::runtime_error` if the expression is not a macro rule.
+     * @throws Throws a `internal_error` if the expression is not a macro rule.
      */
     [[nodiscard]]
     virtual class macro_rule* as_macro_rule();
@@ -237,7 +238,7 @@ public:
     /**
      * Get the expression as a macro rule.
      *
-     * @throws Throws a `std::runtime_error` if the expression is not a macro rule.
+     * @throws Throws a `internal_error` if the expression is not a macro rule.
      */
     [[nodiscard]]
     virtual const class macro_rule* as_macro_rule() const;
@@ -252,7 +253,7 @@ public:
     /**
      * Get the expression as a macro expression list.
      *
-     * @throws Throws a `std::runtime_error` if the expression is not a macro expression list.
+     * @throws Throws a `internal_error` if the expression is not a macro expression list.
      */
     [[nodiscard]]
     virtual class macro_expression_list* as_macro_expression_list();
@@ -260,7 +261,7 @@ public:
     /**
      * Get the expression as a macro expression list.
      *
-     * @throws Throws a `std::runtime_error` if the expression is not a macro expression list.
+     * @throws Throws a `internal_error` if the expression is not a macro expression list.
      */
     [[nodiscard]]
     virtual const class macro_expression_list* as_macro_expression_list() const;
@@ -276,7 +277,7 @@ public:
      * Get the expression as a macro invocation expression.
      *
      * @note Updates the expression's namespace path.
-     * @throws Throws a `std::runtime_error` if the expression is not a macro invocation.
+     * @throws Throws a `internal_error` if the expression is not a macro invocation.
      */
     virtual class macro_invocation* as_macro_invocation();
 
@@ -290,21 +291,21 @@ public:
     /**
      * Get the expression as a literal expression.
      *
-     * @throws Throws a `std::runtime_error` if the expression is not a literal expression.
+     * @throws Throws a `internal_error` if the expression is not a literal expression.
      */
     virtual class literal_expression* as_literal();
 
     /**
      * Get the expression as a struct member access expression.
      *
-     * @throws Throws a `std::runtime_error` if the expression is not a struct member access expression.
+     * @throws Throws a `internal_error` if the expression is not a struct member access expression.
      */
     virtual class access_expression* as_access_expression();
 
     /**
      * Get the expression as a struct member access expression.
      *
-     * @throws Throws a `std::runtime_error` if the expression is a struct member access expression.
+     * @throws Throws a `internal_error` if the expression is a struct member access expression.
      */
     [[nodiscard]]
     virtual const class access_expression* as_access_expression() const;
@@ -319,14 +320,14 @@ public:
     /**
      * Get the expression as a named expression.
      *
-     * @throws Throws a `std::runtime_error` if the expression is not a named expression.
+     * @throws Throws a `internal_error` if the expression is not a named expression.
      */
     virtual class named_expression* as_named_expression();
 
     /**
      * Get the expression as a named expression.
      *
-     * @throws Throws a `std::runtime_error` if the expression is not a named expression.
+     * @throws Throws a `internal_error` if the expression is not a named expression.
      */
     [[nodiscard]]
     virtual const class named_expression* as_named_expression() const;
@@ -597,7 +598,7 @@ public:
      * @param post_order Whether to visit the nodes in post-order. Default is pre-order.
      * @param filter An optional filter that returns `true` if a node
      *               should be traversed. Defaults to traversing all nodes.
-     * @throws Throws a `std::runtime_error` if any child node is `nullptr`.
+     * @throws Throws a `internal_error` if any child node is `nullptr`.
      */
     void visit_nodes(
       std::function<void(expression&)> visitor,
@@ -613,7 +614,7 @@ public:
      * @param post_order Whether to visit the nodes in post-order. Default is pre-order.
      * @param filter An optional filter that returns `true` if a node
      *               should be traversed. Defaults to traversing all nodes.
-     * @throws Throws a `std::runtime_error` if any child node is `nullptr`.
+     * @throws Throws a `internal_error` if any child node is `nullptr`.
      */
     void visit_nodes(
       std::function<void(const expression&)> visitor,

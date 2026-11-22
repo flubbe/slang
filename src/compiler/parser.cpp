@@ -4,12 +4,13 @@
  * the parser. generates an AST from the lexer output.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
 #include <set>
 
+#include "compiler/diagnostics.h"
 #include "shared/type_utils.h"
 #include "parser.h"
 
@@ -17,6 +18,7 @@
 //       and there are checks for validation.
 // NOLINTBEGIN(bugprone-unchecked-optional-access)
 
+namespace diag = slang::compiler::diagnostics;
 namespace ty = slang::typing;
 
 namespace slang
@@ -64,7 +66,8 @@ static void validate_identifier_name(const token& tok)
           tok,
           std::format(
             "Expected <identifier>, got {}.",
-            tok.describe()));
+            tok.describe()))
+          .with_label("expected identifier");
     }
 
     if(is_keyword(tok.s))
@@ -73,7 +76,8 @@ static void validate_identifier_name(const token& tok)
           tok,
           std::format(
             "Expected <identifier>, got keyword '{}'.",
-            tok.s));
+            tok.s))
+          .with_label("keyword used as identifier");
     }
 }
 
@@ -91,7 +95,8 @@ static void validate_base_type(const token& tok)
           tok,
           std::format(
             "Expected <type>, got {}.",
-            tok.describe()));
+            tok.describe()))
+          .with_label("expected type");
     }
 
     // check built-in types.
@@ -103,11 +108,22 @@ static void validate_base_type(const token& tok)
     // check for keywords.
     if(is_keyword(tok.s))
     {
-        throw syntax_error(
-          tok,
-          std::format(
-            "Expected <type>, got keyword '{}'.",
-            tok.s));
+        auto err = syntax_error(
+                     tok,
+                     std::format(
+                       "Expected <type>, got keyword '{}'.",
+                       tok.s))
+                     .with_label("keyword used as type");
+
+        static const std::vector<std::string> builtin_types = {
+          "i8", "i16", "i32", "i64", "f32", "f64", "str", "void"};
+
+        if(auto hint = diag::find_closest_match(tok.s, builtin_types))
+        {
+            err.did_you_mean = *hint;
+        }
+
+        throw err;
     }
 }
 
@@ -197,7 +213,10 @@ std::unique_ptr<ast::expression> parser::parse_top_level_statement()
 
     if(current_token->s == "let")
     {
-        return parse_variable();
+        throw syntax_error(
+          *current_token,
+          "Local variable declarations are not allowed at the top level. Use 'const' for module-level constants, or declare variables inside a function body.")
+          .with_label("not allowed at top level");
     }
 
     if(current_token->s == "const")
@@ -215,11 +234,22 @@ std::unique_ptr<ast::expression> parser::parse_top_level_statement()
         return parse_macro();
     }
 
-    throw syntax_error(
-      *current_token,
-      std::format(
-        "Unexpected token '{}'",
-        current_token->s));
+    auto err = syntax_error(
+                 *current_token,
+                 std::format(
+                   "Unexpected token '{}'",
+                   current_token->s))
+                 .with_label("unexpected token");
+
+    static const std::vector<std::string> top_level_keywords = {
+      "import", "struct", "const", "fn", "macro"};
+
+    if(auto hint = diag::find_closest_match(current_token->s, top_level_keywords))
+    {
+        err.did_you_mean = *hint;
+    }
+
+    throw err;
 }
 
 // import ::= 'import' path_expr ';'
@@ -381,7 +411,9 @@ std::unique_ptr<ast::function_expression> parser::parse_definition()
     {
         throw syntax_error(
           current_token->location,
-          "expected function body; found EOF.");
+          "expected function body; found EOF.")
+          .with_label("expected function body")
+          .with_help("expected a body surrounded by '{' and '}' or a ';' for a declaration");
     }
 
     // check if we have a function body.
@@ -672,7 +704,9 @@ std::unique_ptr<ast::struct_definition_expression> parser::parse_struct()
           *current_token,
           std::format(
             "Expected '{{', got {}.",
-            current_token->describe()));
+            current_token->describe()))
+          .with_label("expected '{'")
+          .with_help("expected a body surrounded by '{' and '}'");
     }
 
     get_next_token();    // skip '{'.
@@ -858,7 +892,9 @@ std::unique_ptr<ast::block> parser::parse_block(bool skip_closing_brace)
           *current_token,
           std::format(
             "Expected '{{', got {}.",
-            current_token->describe()));
+            current_token->describe()))
+          .with_label("expected '{'")
+          .with_help("expected a body surrounded by '{' and '}'");
     }
     get_next_token();
 
@@ -947,11 +983,22 @@ std::unique_ptr<ast::expression> parser::parse_block_stmt()
     {
         if(is_keyword(current_token->s))
         {
-            throw syntax_error(
-              *current_token,
-              std::format(
-                "Unexpected keyword '{}'.",
-                current_token->s));
+            auto err = syntax_error(
+                         *current_token,
+                         std::format(
+                           "Unexpected keyword '{}'.",
+                           current_token->s))
+                         .with_label("unexpected keyword");
+
+            static const std::vector<std::string> stmt_keywords = {
+              "if", "while", "let", "break", "continue", "return"};
+
+            if(auto hint = diag::find_closest_match(current_token->s, stmt_keywords))
+            {
+                err.did_you_mean = *hint;
+            }
+
+            throw err;
         }
 
         stmt = std::make_unique<ast::expression_statement>(
@@ -964,7 +1011,8 @@ std::unique_ptr<ast::expression> parser::parse_block_stmt()
           *current_token,
           std::format(
             "Expected ';', got {}.",
-            current_token->describe()));
+            current_token->describe()))
+          .with_label("expected ';'");
     }
     get_next_token();
 
@@ -1724,7 +1772,9 @@ std::unique_ptr<ast::macro_expression> parser::parse_macro()
           *current_token,
           std::format(
             "Expected '{{', got {}.",
-            current_token->describe()));
+            current_token->describe()))
+          .with_label("expected '{'")
+          .with_help("expected a body surrounded by '{' and '}'");
     }
     get_next_token();
 

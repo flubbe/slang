@@ -5,10 +5,11 @@
  * of subclasses of `expression`.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
+#include "compiler/errors.h"
 #include "node_registry.h"
 #include "ast.h"
 #include "builtins.h"
@@ -61,7 +62,7 @@ std::unique_ptr<expression> construct(node_identifier id)
     case node_identifier::format_macro_expression: return std::make_unique<format_macro_expression>();
     }
 
-    throw std::runtime_error(
+    throw internal_error(
       std::format(
         "Cannot construct AST node from unknown id {}.",
         std::to_underlying(id)));

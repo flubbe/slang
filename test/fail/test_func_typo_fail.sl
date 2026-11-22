@@ -1,7 +1,6 @@
 // A misspelled imported function should yield a "did you mean" suggestion.
 import std;
 
-fn main() -> void
-{
+fn main() -> void {
     std::prntln("");
 }

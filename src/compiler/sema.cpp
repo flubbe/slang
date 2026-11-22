@@ -58,7 +58,7 @@ std::string to_string(symbol_type t)
         return "macro_argument";
     }
 
-    throw std::runtime_error(
+    throw internal_error(
       std::format(
         "Unknown symbol type '{}'.",
         std::to_underlying(t)));
@@ -108,7 +108,7 @@ std::optional<symbol_id> env::get_symbol_id(
         auto scope_it = scope_map.find(id);
         if(scope_it == scope_map.end())
         {
-            throw std::runtime_error(
+            throw internal_error(
               std::format(
                 "Cannot find scope for id '{}'.",
                 id));

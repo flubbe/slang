@@ -792,11 +792,11 @@ void macro_expression::collect_macro(sema::env& sema_env, macro::env& macro_env)
 {
     if(!symbol_id.has_value())
     {
-        throw std::runtime_error(
+        throw internal_error{
+          get_location(),
           std::format(
-            "{}: Macro '{}' has no symbol id.",
-            ::slang::to_string(get_location()),
-            get_qualified_name()));
+            "Macro '{}' has no symbol id.",
+            get_qualified_name())};
     }
 
     std::vector<std::pair<std::string, module_::directive_descriptor>> attributes;

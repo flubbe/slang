@@ -4,7 +4,7 @@
  * Type system tests.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -82,7 +82,7 @@ TEST(type_system, name_collection)
 TEST(type_system, variables)
 {
     {
-        const std::string test_input = "let a: i32 = 1;";
+        const std::string test_input = "fn test() -> void { let a: i32 = 1; }";
 
         slang::parser parser;
         ASSERT_NO_THROW(parser.parse(slang::lexer::lex(test_input)));
@@ -100,7 +100,7 @@ TEST(type_system, variables)
         EXPECT_NO_THROW(ast->type_check(type_ctx, sema_env));
     }
     {
-        const std::string test_input = "let a: f32 = 1.0 as f32;";
+        const std::string test_input = "fn test() -> void { let a: f32 = 1.0 as f32; }";
 
         slang::parser parser;
         ASSERT_NO_THROW(parser.parse(slang::lexer::lex(test_input)));
@@ -118,7 +118,7 @@ TEST(type_system, variables)
         EXPECT_NO_THROW(ast->type_check(type_ctx, sema_env));
     }
     {
-        const std::string test_input = "let a: str = \"test\";";
+        const std::string test_input = "fn test() -> void { let a: str = \"test\"; }";
 
         slang::parser parser;
         ASSERT_NO_THROW(parser.parse(slang::lexer::lex(test_input)));
@@ -136,7 +136,7 @@ TEST(type_system, variables)
         EXPECT_NO_THROW(ast->type_check(type_ctx, sema_env));
     }
     {
-        const std::string test_input = "let a: str = 1.0;";
+        const std::string test_input = "fn test() -> void { let a: str = 1.0; }";
 
         slang::parser parser;
         ASSERT_NO_THROW(parser.parse(slang::lexer::lex(test_input)));
@@ -154,7 +154,7 @@ TEST(type_system, variables)
         EXPECT_THROW(ast->type_check(type_ctx, sema_env), ty::type_error);
     }
     {
-        const std::string test_input = "let a: i32 = 1.0;";
+        const std::string test_input = "fn test() -> void { let a: i32 = 1.0; }";
 
         slang::parser parser;
         ASSERT_NO_THROW(parser.parse(slang::lexer::lex(test_input)));
@@ -172,7 +172,7 @@ TEST(type_system, variables)
         EXPECT_THROW(ast->type_check(type_ctx, sema_env), ty::type_error);
     }
     {
-        const std::string test_input = "let a: f32 = \"Test\";";
+        const std::string test_input = "fn test() -> void { let a: f32 = \"Test\"; }";
 
         slang::parser parser;
         ASSERT_NO_THROW(parser.parse(slang::lexer::lex(test_input)));
@@ -191,8 +191,10 @@ TEST(type_system, variables)
     }
     {
         const std::string test_input =
+          "fn test() -> void {\n"
           "let a: f32 = 1.0 as f32;\n"
-          "let b: f32 = a;";
+          "let b: f32 = a;\n"
+          "}";
 
         slang::parser parser;
         ASSERT_NO_THROW(parser.parse(slang::lexer::lex(test_input)));
@@ -211,8 +213,10 @@ TEST(type_system, variables)
     }
     {
         const std::string test_input =
+          "fn test() -> void {\n"
           "let a: f32 = 1.;\n"
-          "let b: str = a;";
+          "let b: str = a;\n"
+          "}";
 
         slang::parser parser;
         ASSERT_NO_THROW(parser.parse(slang::lexer::lex(test_input)));
@@ -231,7 +235,9 @@ TEST(type_system, variables)
     }
     {
         const std::string test_input =
-          "let s: S;\n";
+          "fn test() -> void {\n"
+          "let s: S;\n"
+          "}";
 
         slang::parser parser;
         parser.parse(slang::lexer::lex(test_input));
@@ -254,7 +260,7 @@ TEST(type_system, explicit_cast)
 {
     {
         const std::string test_input =
-          "let a: i32 = 1. as i32;";
+          "fn test() -> void { let a: i32 = 1. as i32; }";
 
         slang::parser parser;
         ASSERT_NO_THROW(parser.parse(slang::lexer::lex(test_input)));
@@ -273,7 +279,9 @@ TEST(type_system, explicit_cast)
     }
     {
         const std::string test_input =
-          "let a: i32 = ((1 + 1. as i32) as f32 * 2. as f32) as i32;";
+          "fn test() -> void {"
+          "let a: i32 = ((1 + 1. as i32) as f32 * 2. as f32) as i32;"
+          "}";
 
         slang::parser parser;
         ASSERT_NO_THROW(parser.parse(slang::lexer::lex(test_input)));
@@ -292,7 +300,9 @@ TEST(type_system, explicit_cast)
     }
     {
         const std::string test_input =
-          "let a: i32 = ((1 + 1. as i32) as f32 * 2 as f32) as i32;";
+          "fn test() -> void {"
+          "let a: i32 = ((1 + 1. as i32) as f32 * 2 as f32) as i32;"
+          "}";
 
         slang::parser parser;
         ASSERT_NO_THROW(parser.parse(slang::lexer::lex(test_input)));
@@ -311,7 +321,9 @@ TEST(type_system, explicit_cast)
     }
     {
         const std::string test_input =
-          "let a: i32 = ((1 + 1. as i32) as f32 * 2) as i32;";
+          "fn test() -> void {"
+          "let a: i32 = ((1 + 1. as i32) as f32 * 2) as i32;"
+          "}";
 
         slang::parser parser;
         ASSERT_NO_THROW(parser.parse(slang::lexer::lex(test_input)));
@@ -330,14 +342,18 @@ TEST(type_system, explicit_cast)
     }
     {
         const std::string test_input =
-          "let a: f32 = 1. as i32 as f32;";
+          "fn test() -> void {"
+          "let a: f32 = 1. as i32 as f32;"
+          "}";
 
         slang::parser parser;
         ASSERT_THROW(parser.parse(slang::lexer::lex(test_input)), slang::syntax_error);
     }
     {
         const std::string test_input =
-          "let a: f32 = (1. as i32) as f32;";
+          "fn test() -> void {"
+          "let a: f32 = (1. as i32) as f32;"
+          "}";
 
         slang::parser parser;
         ASSERT_NO_THROW(parser.parse(slang::lexer::lex(test_input)));
@@ -348,7 +364,9 @@ TEST(type_system, binary_operators)
 {
     {
         const std::string test_input =
-          "let a: f32 = 1. as f32 + 2. as f32;";
+          "fn test() -> void {"
+          "let a: f32 = 1. as f32 + 2. as f32;"
+          "}";
 
         slang::parser parser;
         parser.parse(slang::lexer::lex(test_input));
@@ -367,7 +385,9 @@ TEST(type_system, binary_operators)
     }
     {
         const std::string test_input =
-          "let a: i32 = 1. + 2.;";
+          "fn test() -> void {"
+          "let a: i32 = 1. + 2.;"
+          "}";
 
         slang::parser parser;
         parser.parse(slang::lexer::lex(test_input));
@@ -386,7 +406,9 @@ TEST(type_system, binary_operators)
     }
     {
         const std::string test_input =
-          "let a: i32 = 1. + 2;";
+          "fn test() -> void {"
+          "let a: i32 = 1. + 2;"
+          "}";
 
         slang::parser parser;
         parser.parse(slang::lexer::lex(test_input));
@@ -405,7 +427,9 @@ TEST(type_system, binary_operators)
     }
     {
         const std::string test_input =
-          "let a: i32 = 1 >> 2;";
+          "fn test() -> void {"
+          "let a: i32 = 1 >> 2;"
+          "}";
 
         slang::parser parser;
         parser.parse(slang::lexer::lex(test_input));
@@ -424,7 +448,9 @@ TEST(type_system, binary_operators)
     }
     {
         const std::string test_input =
-          "let a: i32 = 1 >> 2.;";
+          "fn test() -> void {"
+          "let a: i32 = 1 >> 2.;"
+          "}";
 
         slang::parser parser;
         parser.parse(slang::lexer::lex(test_input));
@@ -447,10 +473,12 @@ TEST(type_system, unary_operators)
 {
     {
         const std::string test_input =
+          "fn test () -> void {"
           "let a: i32 = +1;"
           "let b: i32 = -1;"
           "let c: i32 = ~1;"
-          "let d: i32 = !1;";
+          "let d: i32 = !1;"
+          "}";
 
         slang::parser parser;
         ASSERT_NO_THROW(parser.parse(slang::lexer::lex(test_input)));
@@ -469,8 +497,10 @@ TEST(type_system, unary_operators)
     }
     {
         const std::string test_input =
+          "fn test() -> void {"
           "let a: i32 = +(1 + 2);"
-          "let b: i32 = -+1;";
+          "let b: i32 = -+1;"
+          "}";
 
         slang::parser parser;
         ASSERT_NO_THROW(parser.parse(slang::lexer::lex(test_input)));
@@ -489,7 +519,9 @@ TEST(type_system, unary_operators)
     }
     {
         const std::string test_input =
-          "let a: f32 = ~1.;";
+          "fn test() -> void {"
+          "let a: f32 = ~1.;"
+          "}";
 
         slang::parser parser;
         ASSERT_NO_THROW(parser.parse(slang::lexer::lex(test_input)));
@@ -508,7 +540,9 @@ TEST(type_system, unary_operators)
     }
     {
         const std::string test_input =
-          "let a: i32 = !1.;";
+          "fn test() -> void {"
+          "let a: i32 = !1.;"
+          "}";
 
         slang::parser parser;
         ASSERT_NO_THROW(parser.parse(slang::lexer::lex(test_input)));
@@ -527,7 +561,9 @@ TEST(type_system, unary_operators)
     }
     {
         const std::string test_input =
-          "let a: str = !\"test\";";
+          "fn test() -> void {"
+          "let a: str = !\"test\";"
+          "}";
 
         slang::parser parser;
         ASSERT_NO_THROW(parser.parse(slang::lexer::lex(test_input)));
@@ -984,7 +1020,9 @@ TEST(type_system, structs)
           " a: i32,\n"
           " b: f32\n"
           "};\n"
-          "let s: S;";
+          "fn test() -> void {"
+          "let s: S;"
+          "}";
 
         slang::parser parser;
         parser.parse(slang::lexer::lex(test_input));
@@ -1010,7 +1048,7 @@ TEST(type_system, structs)
     }
     {
         const std::string test_input =
-          "let s: S;\n"
+          "fn test() -> void { let s: S; }\n"
           "struct S\n"
           "{\n"
           " a: i32,\n"

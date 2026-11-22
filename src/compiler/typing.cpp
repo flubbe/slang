@@ -35,7 +35,7 @@ std::string to_string(type_kind kind)
     case type_kind::array: return "array";
     case type_kind::struct_: return "struct";
     default:
-        throw std::runtime_error(
+        throw internal_error(
           std::format(
             "Cannot convert type kind {} to string.",
             std::to_underlying(kind)));
@@ -72,7 +72,7 @@ static std::string to_string(builtins b)
     case builtins::f64: return "f64";
     case builtins::str: return "str";
     default:
-        throw std::runtime_error(
+        throw internal_error(
           std::format(
             "Cannot convert builtin type {} to string.",
             std::to_underlying(b)));
@@ -103,7 +103,7 @@ type_id context::add_builtin(builtins builtin)
       });
     if(it != type_info_map.end())
     {
-        throw std::runtime_error(
+        throw internal_error(
           std::format(
             "Built-in type '{}' already defined.",
             ty::to_string(builtin)));
@@ -420,6 +420,7 @@ type_error context::make_type_not_found_error(
       std::format("Type '{}' not found.", name),
       text.has_value() ? text : name};
     err.did_you_mean = diag::find_closest_match(name, get_type_names());
+    err.with_label("unknown type");
     return err;
 }
 
@@ -739,7 +740,7 @@ std::string context::to_string(type_id id) const
     }
     else
     {
-        throw std::runtime_error(
+        throw internal_error(
           std::format(
             "Unknown base type of kind {}",
             ::ty::to_string(it->second.kind)));

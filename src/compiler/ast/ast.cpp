@@ -29,6 +29,7 @@
 #include "utils.h"
 
 namespace cg = slang::codegen;
+namespace diag = slang::compiler::diagnostics;
 namespace ty = slang::typing;
 
 namespace slang::ast
@@ -99,82 +100,82 @@ void expression::serialize(archive& ar)
 
 call_expression* expression::as_call_expression()
 {
-    throw std::runtime_error{"Expression is not a call expression."};
+    throw internal_error{loc, "Expression is not a call expression."};
 }
 
 macro_expression* expression::as_macro_expression()
 {
-    throw std::runtime_error{"Expression is not a macro."};
+    throw internal_error{loc, "Expression is not a macro."};
 }
 
 macro_rule* expression::as_macro_rule()
 {
-    throw std::runtime_error{"Expression is not a macro rule."};
+    throw internal_error{loc, "Expression is not a macro rule."};
 }
 
 const macro_rule* expression::as_macro_rule() const
 {
-    throw std::runtime_error{"Expression is not a macro rule."};
+    throw internal_error{loc, "Expression is not a macro rule."};
 }
 
 macro_expression_list* expression::as_macro_expression_list()
 {
-    throw std::runtime_error{"Expression is not a macro expression list."};
+    throw internal_error{loc, "Expression is not a macro expression list."};
 }
 
 const macro_expression_list* expression::as_macro_expression_list() const
 {
-    throw std::runtime_error{"Expression is not a macro expression list."};
+    throw internal_error{loc, "Expression is not a macro expression list."};
 }
 
 variable_declaration_expression* expression::as_variable_declaration()
 {
-    throw std::runtime_error{"Expression is not a variable declaration."};
+    throw internal_error{loc, "Expression is not a variable declaration."};
 }
 
 constant_declaration_expression* expression::as_constant_declaration()
 {
-    throw std::runtime_error{"Expression is not a constant declaration."};
+    throw internal_error{loc, "Expression is not a constant declaration."};
 }
 
 const constant_declaration_expression* expression::as_constant_declaration() const
 {
-    throw std::runtime_error{"Expression is not a constant declaration."};
+    throw internal_error{loc, "Expression is not a constant declaration."};
 }
 
 variable_reference_expression* expression::as_variable_reference()
 {
-    throw std::runtime_error{"Expression is not a variable reference."};
+    throw internal_error{loc, "Expression is not a variable reference."};
 }
 
 macro_invocation* expression::as_macro_invocation()
 {
-    throw std::runtime_error{"Expression is not a macro invocation."};
+    throw internal_error{loc, "Expression is not a macro invocation."};
 }
 
 literal_expression* expression::as_literal()
 {
-    throw std::runtime_error{"Expression is not a literal."};
+    throw internal_error{loc, "Expression is not a literal."};
 }
 
 access_expression* expression::as_access_expression()
 {
-    throw std::runtime_error{"Expression is not an access expression."};
+    throw internal_error{loc, "Expression is not an access expression."};
 }
 
 const access_expression* expression::as_access_expression() const
 {
-    throw std::runtime_error{"Expression is not an access expression."};
+    throw internal_error{loc, "Expression is not an access expression."};
 }
 
 named_expression* expression::as_named_expression()
 {
-    throw std::runtime_error{"Expression is not a named expression."};
+    throw internal_error{loc, "Expression is not a named expression."};
 }
 
 const named_expression* expression::as_named_expression() const
 {
-    throw std::runtime_error{"Expression is not a named expression."};
+    throw internal_error{loc, "Expression is not a named expression."};
 }
 
 std::unique_ptr<cg::rvalue> expression::try_emit_const_eval_result(
@@ -403,10 +404,9 @@ void expression::bind_constant_declarations(
           std::optional<sema::symbol_id> symbol_id = expr.as_constant_declaration()->get_symbol_id();
           if(!symbol_id.has_value())
           {
-              throw std::runtime_error{
-                std::format(
-                  "{}: Constant has no symbol id.",
-                  slang::to_string(expr.get_location()))};
+              throw internal_error{
+                expr.get_location(),
+                "Constant has no symbol id."};
           }
 
           const_env.register_constant(symbol_id.value());
@@ -449,19 +449,17 @@ void expression::evaluate_constant_expressions(
               {
                   if(env.const_info_map.contains(symbol_id.value()))
                   {
-                      throw std::runtime_error{
-                        std::format(
-                          "{}: Symbol id already contained in constant map.",
-                          slang::to_string(expr.get_location()))};
+                      throw internal_error{
+                        expr.get_location(),
+                        "Symbol id already contained in constant map."};
                   }
 
                   const auto* const_expr = const_decl->get_expr();
                   if(!const_expr)
                   {
-                      throw std::runtime_error{
-                        std::format(
-                          "{}: Constant expression has invalid handle.",
-                          slang::to_string(expr.get_location()))};
+                      throw internal_error{
+                        expr.get_location(),
+                        "Constant expression has invalid handle."};
                   }
 
                   auto const_value = env.get_expression_value(*const_expr);
@@ -505,7 +503,7 @@ void expression::insert_implicit_casts(
 
 std::string expression::to_string() const
 {
-    throw std::runtime_error{"Expression has no string conversion"};
+    throw internal_error{"Expression has no string conversion"};
 }
 
 /**
@@ -544,7 +542,7 @@ void visit_nodes(
 
         if(current == nullptr)
         {
-            throw std::runtime_error{"Null expression in AST."};
+            throw internal_error{"Null expression in AST."};
         }
 
         if(!filter || filter(*current))
@@ -1601,23 +1599,52 @@ std::optional<ty::type_id> access_expression::type_check(
     // get field.
     if(rhs->get_id() != node_identifier::variable_reference_expression)
     {
-        throw std::runtime_error{
+        throw ty::type_error{
+          loc,
           std::format(
-            "{}: Expected <identifier> as accessor (got node id {}).",
-            slang::to_string(loc),
+            "Expected <identifier> as accessor (got node id {}).",
             std::to_underlying(rhs->get_id()))};
     }
 
     const auto* identifier_node = rhs->as_variable_reference();
-    std::optional<std::size_t> fi = ctx.get_field_index(type.value(), identifier_node->get_name());
+    std::optional<std::size_t> fi = ctx.get_field_index(
+      type.value(),
+      identifier_node->get_name());
     if(!fi.has_value())
     {
-        throw ty::type_error{
+        auto err = ty::type_error{
           loc,
           std::format(
             "No field '{}' found in struct '{}'.",
             identifier_node->get_name(),
-            ctx.to_string(type.value()))};
+            ctx.to_string(type.value())),
+          identifier_node->get_name()};
+        err.with_label("unknown field");
+
+        std::vector<std::string> candidate_fields;
+
+        // Need to distinguish structs and arrays.
+        if(struct_info.has_value())
+        {
+            for(const auto& field: struct_info.value().fields)
+            {
+                candidate_fields.push_back(field.name);
+            }
+        }
+        else
+        {
+            // array.
+            candidate_fields = {"length"};
+        }
+
+        if(auto hint = diag::find_closest_match(
+             identifier_node->get_name(),
+             candidate_fields))
+        {
+            err.did_you_mean = *hint;
+        }
+
+        throw err;
     }
     field_index = fi.value();
     std::optional<ty::type_id> ft = ctx.get_field_type(type.value(), field_index);
@@ -1904,10 +1931,9 @@ expression* directive_expression::get_target()
 
     if(it == nullptr)
     {
-        throw std::runtime_error{
-          std::format(
-            "{}: Directive without target",
-            slang::to_string(get_location()))};
+        throw internal_error{
+          get_location(),
+          "Directive without target"};
     }
 
     return it;
@@ -1925,10 +1951,9 @@ const expression* directive_expression::get_target() const
 
     if(it == nullptr)
     {
-        throw std::runtime_error{
-          std::format(
-            "{}: Directive without target",
-            slang::to_string(get_location()))};
+        throw internal_error{
+          get_location(),
+          "Directive without target"};
     }
 
     return it;
@@ -2554,7 +2579,13 @@ std::optional<ty::type_id> variable_declaration_expression::type_check(
               std::format(
                 "R.h.s. has type '{}', which does not match the variable's type '{}'.",
                 ctx.to_string(rhs.value()),
-                ctx.to_string(annotated_type_id.value()))};
+                ctx.to_string(annotated_type_id.value()))}
+              .with_label("type mismatch")
+              .with_note(
+                std::format(
+                  "expected `{}`, found `{}`",
+                  ctx.to_string(annotated_type_id.value()),
+                  ctx.to_string(rhs.value())));
         }
     }
 
@@ -2833,7 +2864,10 @@ std::optional<ty::type_id> array_initializer_expression::type_check(
                   std::format(
                     "Initializer types do not match. Found '{}' and '{}'.",
                     ctx.to_string(element_type.value()),
-                    ctx.to_string(type.value()))};
+                    ctx.to_string(type.value()))}
+                  .with_label("mixed element types")
+                  .with_help(
+                    "all elements of an array initializer must have the same type");
             }
         }
         else
@@ -3554,10 +3588,11 @@ std::unique_ptr<cg::rvalue> assignment_expression::emit_rvalue(
         auto it = binary_op_map.find(reduced_op);
         if(it == binary_op_map.end())
         {
-            throw std::runtime_error{
+            throw internal_error{
+              loc,
               std::format(
-                "{}: Code generation for binary operator '{}' not implemented.",
-                slang::to_string(loc), op.s)};
+                "Code generation for binary operator '{}' not implemented.",
+                op.s)};
         }
 
         ctx.generate_binary_op(it->second, lhs_value->get_type());
@@ -4222,10 +4257,11 @@ std::unique_ptr<cg::rvalue> binary_expression::emit_rvalue(
     auto it = binary_op_map.find(op.s);
     if(it == binary_op_map.end())
     {
-        throw std::runtime_error{
+        throw internal_error{
+          loc,
           std::format(
-            "{}: Code generation for binary operator '{}' not implemented.",
-            slang::to_string(loc), op.s)};
+            "Code generation for binary operator '{}' not implemented.",
+            op.s)};
     }
 
     ctx.generate_binary_op(it->second, lhs_value->get_type());
@@ -4268,7 +4304,8 @@ std::optional<ty::type_id> binary_expression::type_check(
     if(op.s == ".")    // struct access
     {
         // TODO change or improve error message.
-        throw std::runtime_error{
+        throw internal_error{
+          loc,
           "Struct access is not handled by binary_expression"};
     }
 
@@ -4716,10 +4753,10 @@ std::unique_ptr<cg::rvalue> unary_expression::emit_rvalue(
         return std::make_unique<cg::rvalue>(constant_type);
     }
 
-    throw std::runtime_error{
+    throw internal_error{
+      loc,
       std::format(
-        "{}: Code generation for unary operator '{}' not implemented.",
-        slang::to_string(loc),
+        "Code generation for unary operator '{}' not implemented.",
         op.s)};
 }
 

@@ -475,7 +475,7 @@ public:
         if(type != type_kind::i32
            && type != type_kind::i64)
         {
-            throw std::runtime_error("Constant type does not match.");
+            throw internal_error("Constant type does not match.");
         }
     }
 
@@ -496,7 +496,7 @@ public:
         if(type != type_kind::f32
            && type != type_kind::f64)
         {
-            throw std::runtime_error("Constant type does not match.");
+            throw internal_error("Constant type does not match.");
         }
     }
 

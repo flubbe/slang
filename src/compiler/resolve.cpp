@@ -753,9 +753,19 @@ void context::resolve_imports(
             }
             catch(const file_error& e)
             {
-                throw import_error{
+                auto err = import_error{
                   spec.location,
-                  e.what()};
+                  e.what(),
+                  qualified_module_name};
+                err.with_label("unknown module");
+
+                auto candidates = loader.get_available_modules();
+                if(auto hint = diag::find_closest_match(qualified_module_name, candidates))
+                {
+                    err.did_you_mean = *hint;
+                }
+
+                throw err;
             }
         }();
 

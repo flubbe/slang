@@ -333,12 +333,28 @@ void compile::invoke(const std::vector<std::string>& args)
           module_path.string(),
           diag::source_span{e.location, length},
           e.message);
+
+        if(e.label.has_value())
+        {
+            d.with_label(*e.label);
+        }
+
+        for(const auto& note: e.notes)
+        {
+            d.with_note(note);
+        }
+
         if(e.did_you_mean.has_value())
         {
             d.with_help(
               std::format(
                 "did you mean `{}`?",
                 *e.did_you_mean));
+        }
+
+        for(const auto& help: e.help)
+        {
+            d.with_help(help);
         }
 
         abort_if_errors();

@@ -14,6 +14,8 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "shared/location.h"
 
@@ -50,6 +52,43 @@ struct source_error : public std::runtime_error
      * diagnostic reporting site and emitted as a help sub-diagnostic.
      */
     std::optional<std::string> did_you_mean{};
+
+    /** Optional span underline label, e.g. "unexpected token", "type mismatch". */
+    std::optional<std::string> label{};
+
+    /** Additional secondary notes. */
+    std::vector<std::string> notes{};
+
+    /** Additional help messages. */
+    std::vector<std::string> help{};
+
+    template<typename Self>
+    Self&& with_label(this Self&& self, std::string l)
+    {
+        self.label = std::move(l);
+        return std::forward<Self>(self);
+    }
+
+    template<typename Self>
+    Self&& with_note(this Self&& self, std::string n)
+    {
+        self.notes.push_back(std::move(n));
+        return std::forward<Self>(self);
+    }
+
+    template<typename Self>
+    Self&& with_help(this Self&& self, std::string h)
+    {
+        self.help.push_back(std::move(h));
+        return std::forward<Self>(self);
+    }
+
+    template<typename Self>
+    Self&& with_did_you_mean(this Self&& self, std::string dym)
+    {
+        self.did_you_mean = std::move(dym);
+        return std::forward<Self>(self);
+    }
 
     /** Construct from a message only; the location defaults to the file start. */
     explicit source_error(

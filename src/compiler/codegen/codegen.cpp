@@ -4,7 +4,7 @@
  * code generation.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -146,7 +146,7 @@ std::string type::to_string([[maybe_unused]] const name_resolver* resolver) cons
         return it->second;
     }
 
-    throw std::runtime_error("Invalid type kind.");
+    throw internal_error("Invalid type kind.");
 }
 
 /*

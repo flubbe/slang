@@ -149,7 +149,7 @@ void validate_arg_type(
   typing::type_id arg_type,
   const std::optional<char>& specifier,
   const typing::context& ctx,
-  [[maybe_unused]] source_location loc)
+  source_location loc)
 {
     if(!specifier.has_value())
     {
@@ -162,8 +162,12 @@ void validate_arg_type(
            || arg_type == ctx.get_str_type())
             return;
 
-        throw std::runtime_error{
-          "format!: argument is not convertible to a string."};
+        throw format_error{
+          loc,
+          "format!: argument is not convertible to a string."}
+          .with_help(
+            "without a specifier, the argument must be an integer "
+            "(i8/i16/i32/i64), a float (f32/f64), or a 'str'");
     }
 
     switch(specifier.value())
@@ -174,30 +178,52 @@ void validate_arg_type(
            && arg_type != ctx.get_i32_type()
            && arg_type != ctx.get_i64_type())
         {
-            throw std::runtime_error{
-              "format!: argument has wrong type for 'd' specifier."};
+            throw format_error{
+              loc,
+              "format!: argument has wrong type for 'd' specifier."}
+              .with_label("type mismatch")
+              .with_note(
+                std::format(
+                  "the 'd' specifier expects an integer (i8/i16/i32/i64); got '{}'",
+                  ctx.to_string(arg_type)));
         }
         break;
     case 'f':
         if(arg_type != ctx.get_f32_type()
            && arg_type != ctx.get_f64_type())
         {
-            throw std::runtime_error{
-              "format!: argument has wrong type for 'f' specifier."};
+            throw format_error{
+              loc,
+              "format!: argument has wrong type for 'f' specifier."}
+              .with_label("type mismatch")
+              .with_note(
+                std::format(
+                  "the 'f' specifier expects a float (f32/f64); got '{}'",
+                  ctx.to_string(arg_type)));
         }
         break;
     case 's':
         if(arg_type != ctx.get_str_type())
         {
-            throw std::runtime_error{
-              "format!: argument has wrong type for 's' specifier."};
+            throw format_error{
+              loc,
+              "format!: argument has wrong type for 's' specifier."}
+              .with_label("type mismatch")
+              .with_note(
+                std::format(
+                  "the 's' specifier expects a 'str'; got '{}'",
+                  ctx.to_string(arg_type)));
         }
         break;
     default:
-        throw std::runtime_error{
+        throw format_error{
+          loc,
           std::format(
             "format!: unknown specifier '{}'.",
-            specifier.value())};
+            specifier.value())}
+          .with_label("invalid format specifier")
+          .with_help(
+            "valid specifiers are 'd' (integer), 'f' (float), and 's' (string)");
     }
 }
 

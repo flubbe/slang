@@ -189,7 +189,9 @@ add_gtest_executable(test_vector test_vector.cpp)
 
 add_gtest_executable(test_builtins
     macros/test_builtins.cpp
+    ../src/compiler/diagnostics.cpp
     ../src/compiler/format_util.cpp
+    ../src/compiler/typing.cpp
     ../src/shared/location.cpp
 )
 
@@ -317,7 +319,7 @@ set_tests_properties("slang type typo suggest"
     FAIL_REGULAR_EXPRESSION "did you mean `custom_type`")
 
 add_my_test(
-  "slang type import typo suggest" slang compile test/fail/test_type_import_typo_fail)
+    "slang type import typo suggest" slang compile test/fail/test_type_import_typo_fail)
 set_tests_properties("slang type import typo suggest"
     PROPERTIES
     WILL_FAIL TRUE
@@ -329,6 +331,18 @@ set_tests_properties("slang func typo suggest"
     PROPERTIES
     WILL_FAIL TRUE
     FAIL_REGULAR_EXPRESSION "did you mean `std::println`")
+
+add_my_test("slang redef suggest" slang compile test/fail/test_redef_fail)
+set_tests_properties("slang redef suggest"
+    PROPERTIES
+    WILL_FAIL TRUE
+    FAIL_REGULAR_EXPRESSION "rename one of the declarations")
+
+add_my_test("slang array init mismatch suggest" slang compile test/fail/test_array_init_mismatch)
+set_tests_properties("slang array init mismatch suggest"
+    PROPERTIES
+    WILL_FAIL TRUE
+    FAIL_REGULAR_EXPRESSION "all elements of an array initializer must have the same type")
 
 add_compile_exec_test("slang conversions" TRUE test/test_conversions)
 add_jit_compile_test("slang conversions" TRUE test/test_conversions)
@@ -374,6 +388,13 @@ add_compile_fail_test("slang macros fail 12" FALSE test/macros/test_fail12)
 add_compile_fail_test("slang macros format fail 1" TRUE test/macros/test_format_fail1)
 add_compile_fail_test("slang macros format fail 2" TRUE test/macros/test_format_fail2)
 add_compile_fail_test("slang macros format fail 3" TRUE test/macros/test_format_fail3)
+
+add_my_test("slang macros format spec d suggest" slang compile test/macros/test_format_spec_d)
+set_tests_properties("slang macros format spec d suggest"
+    PROPERTIES
+    WILL_FAIL TRUE
+    FIXTURES_REQUIRED needs_std
+    FAIL_REGULAR_EXPRESSION "the 'd' specifier expects an integer")
 
 add_compile_exec_test("slang macro import" TRUE test/macros/test_import --search-path test/macros)
 set_property(

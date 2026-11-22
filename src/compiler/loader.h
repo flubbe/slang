@@ -110,6 +110,16 @@ public:
      * @returns Returns the resolved name.
      */
     std::string resolve_name(const std::string& name) const;
+
+    /**
+     * Get available module names across search paths.
+     *
+     * @returns List of available module names.
+     */
+    std::vector<std::string> get_available_modules() const
+    {
+        return file_mgr.get_available_modules();
+    }
 };
 
 }    // namespace slang::loader

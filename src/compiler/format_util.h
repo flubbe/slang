@@ -71,7 +71,7 @@ std::vector<placeholder> parse_format_string(
  * @param specifier The placeholder specifier (d/f/s/nullopt).
  * @param ctx The type context for type comparison.
  * @param loc Source location for error reporting.
- * @throws std::runtime_error if the specifier is unsupported or the type does
+ * @throws format_error if the specifier is unsupported or the type does
  *     not satisfy it.
  */
 void validate_arg_type(

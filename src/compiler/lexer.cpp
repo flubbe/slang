@@ -751,12 +751,73 @@ std::optional<token> lexer::next()
             break;
         }
 
-        throw lexical_error{
+        auto err = lexical_error{
           loc,
           std::format(
-            "Unexpected character '{}' (0x{:x})",
+            "Unexpected character '{}' (0x{:02X})",
             c.value(),
-            static_cast<int>(c.value()))};
+            static_cast<int>(static_cast<unsigned char>(c.value()))),
+          std::string(1, c.value())};
+        err.with_label("unexpected character");
+
+        if(c.value() == '?')
+        {
+            err.with_help("did you mean `:` or `;`?");
+        }
+        else if(c.value() == '@')
+        {
+            err.did_you_mean = "#";
+        }
+        else if(c.value() == '\'' || c.value() == '`')
+        {
+            err.did_you_mean = "\"";
+        }
+        else if(c.value() == '\\')
+        {
+            err.did_you_mean = "/";
+        }
+        else
+        {
+            const auto uc = static_cast<unsigned char>(c.value());
+            if(uc == 0xCD
+               && peek().has_value()
+               && static_cast<unsigned char>(*peek()) == 0xBE)
+            {
+                get();
+                err.text = "\xCD\xBE";
+                err.with_help(
+                  "did you mean `;`? The Greek question mark (U+037E) "
+                  "resembles a semicolon.");
+            }
+            else if(uc == 0xEF
+                    && peek().has_value()
+                    && static_cast<unsigned char>(*peek()) == 0xBC)
+            {
+                get();
+                if(peek().has_value())
+                {
+                    char b3 = *get();
+                    const auto u3 = static_cast<unsigned char>(b3);
+                    if(u3 == 0x9B)
+                    {
+                        err.text = std::string{"\xEF\xBC\x9B", 3};
+                        err.did_you_mean = ";";
+                    }
+                    else if(u3 == 0x9A)
+                    {
+                        err.text = std::string{"\xEF\xBC\x9A", 3};
+                        err.did_you_mean = ":";
+                    }
+                    else if(u3 == 0x8C)
+                    {
+                        err.text = std::string{"\xEF\xBC\x8C", 3};
+                        err.did_you_mean = ",";
+                    }
+                }
+            }
+        }
+
+        throw err;
     }
 
     if(current_token.empty())

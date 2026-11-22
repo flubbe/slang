@@ -33,6 +33,7 @@ void format_macro_expression::expand_late_macros(
     if(expansion)
     {
         throw internal_error{
+          loc,
           "Double 'format!' macro expansion."};
     }
 
@@ -71,6 +72,7 @@ std::unique_ptr<cg::rvalue> format_macro_expression::emit_rvalue(
     if(!expansion)
     {
         throw internal_error{
+          loc,
           "Attempted to emit an unexpanded 'format!' macro."};
     }
 
@@ -136,12 +138,14 @@ std::optional<ty::type_id> format_macro_expression::type_check(
     if(exprs[0]->type_check(ctx, env) != ctx.get_str_type())
     {
         throw internal_error{
+          format_token.location,
           "String literal has unexpected type."};
     }
 
     if(format_token.s.length() < 2)
     {
         throw internal_error{
+          format_token.location,
           "Macro 'format!': Malformed format string."};
     }
 

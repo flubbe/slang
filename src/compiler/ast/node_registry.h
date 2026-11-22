@@ -5,7 +5,7 @@
  * of subclasses of `expression`.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -29,7 +29,7 @@ namespace slang::ast
  *
  * @param id The node identifier.
  * @returns Return an expression node of the specified type.
- * @throws Throws a `std::runtime_error` if the identifier is unknown.
+ * @throws Throws a `internal_error` if the identifier is unknown.
  */
 std::unique_ptr<expression> construct(node_identifier id);
 
@@ -38,7 +38,7 @@ std::unique_ptr<expression> construct(node_identifier id);
  *
  * @param id The node identifier.
  * @returns Return an expression node of the specified type.
- * @throws Throws a `std::runtime_error` if the identifier is unknown.
+ * @throws Throws a `internal_error` if the identifier is unknown.
  */
 template<typename T>
 std::unique_ptr<T> construct(node_identifier id)

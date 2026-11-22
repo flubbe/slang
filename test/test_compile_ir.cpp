@@ -4,7 +4,7 @@
  * Compilation to IR tests.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -209,10 +209,10 @@ TEST(compile_ir, empty)
 TEST(compile_ir, double_definition)
 {
     {
-        // test: global variable redefinition
+        // test: global const redefinition
         const std::string test_input =
-          "let a: i32;\n"
-          "let a: f32;";
+          "const a: i32 = 0;\n"
+          "const a: f32 = 0f32;";
 
         slang::parser parser;
         parser.parse(slang::lexer::lex(test_input));

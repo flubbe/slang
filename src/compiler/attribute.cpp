@@ -4,7 +4,7 @@
  * Attributes.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -48,7 +48,7 @@ std::string to_string(attribute_kind kind)
 
     if(it == attribute_string_map.end())
     {
-        throw std::runtime_error(
+        throw internal_error(
           std::format(
             "Missing string in value-string conversion for attribute with value '{}'.",
             std::to_underlying(kind)));
