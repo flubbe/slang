@@ -7,7 +7,7 @@ from conan.tools.scm import Version
 
 class slangRecipe(ConanFile):
     name = "slang"
-    version = "0.4"
+    version = "0.5"
 
     # Optional metadata
     license = "MIT"
@@ -24,6 +24,7 @@ class slangRecipe(ConanFile):
     def requirements(self):
         self.requires("cxxopts/3.2.0")
         self.requires("ms-gsl/4.1.0")
+        self.requires("simdjson/5.1.1")
         self.test_requires("gtest/[>=1.14.0 <2.0]")
 
     def build_requirements(self):
@@ -37,7 +38,8 @@ class slangRecipe(ConanFile):
         if compiler == "gcc" and compiler_version < "14":
             raise ConanInvalidConfiguration(
                 "slang requires GCC >= 14 (found GCC {}). "
-                "Please use gcc-14/g++-14.".format(compiler_version))
+                "Please use gcc-14/g++-14.".format(compiler_version)
+            )
 
     def layout(self):
         cmake_layout(self)

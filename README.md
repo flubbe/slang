@@ -102,7 +102,9 @@ See [the documentation](docs/language.md) for more details.
 
 ### VS Code integration
 
-A preliminary VS Code extension can be found in [`vscode/slang-language-support`](vscode/slang-language-support).
+A language server extension for VS Code can be found in
+[`vscode/slang-language-support`](vscode/slang-language-support). Build the `slang`
+binary first, then install the extension or open a `.sl` file to auto-launch.
 
 ## Bindings
 

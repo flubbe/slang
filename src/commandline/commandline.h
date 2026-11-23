@@ -200,6 +200,16 @@ public:
     std::string get_description() const override;
 };
 
+/** Language server. */
+class lsp : public command
+{
+public:
+    /** Constructor. */
+    lsp();
+    void invoke(const std::vector<std::string>& args) override;
+    std::string get_description() const override;
+};
+
 /**
  * Set up the default runtime environment for a context.
  *
