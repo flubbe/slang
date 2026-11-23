@@ -91,6 +91,7 @@ add_gtest_executable(test_lsp
     ../src/lsp/json_rpc.cpp
     ../src/lsp/document_store.cpp
     ../src/lsp/diagnostics.cpp
+    ../src/lsp/navigation.cpp
     lsp/test_lsp.cpp
 )
 target_include_directories(test_lsp

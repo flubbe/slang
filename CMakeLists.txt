@@ -144,6 +144,7 @@ set(SOURCES
     src/lsp/json_rpc.cpp
     src/lsp/document_store.cpp
     src/lsp/diagnostics.cpp
+    src/lsp/navigation.cpp
     src/commandline/run.cpp
     src/commandline/runtime.cpp
     src/filemanager.cpp

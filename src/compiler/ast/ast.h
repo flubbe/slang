@@ -2897,6 +2897,13 @@ public:
     {
         return return_type_id;
     }
+
+    /** Return the argument list. */
+    [[nodiscard]]
+    const auto& get_args() const
+    {
+        return args;
+    }
 };
 
 /** AST of a code block. */
@@ -3103,6 +3110,20 @@ public:
     ty::type_id get_return_type_id() const
     {
         return prototype->get_return_type_id();
+    }
+
+    /** Return the function prototype. */
+    [[nodiscard]]
+    const prototype_ast* get_prototype() const
+    {
+        return prototype.get();
+    }
+
+    /** Return the function body. */
+    [[nodiscard]]
+    const block* get_body() const
+    {
+        return body.get();
     }
 };
 

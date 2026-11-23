@@ -33,6 +33,13 @@ struct lsp_range
     lsp_position end;
 };
 
+/** LSP Location (URI and range). */
+struct lsp_location
+{
+    std::string uri;
+    lsp_range range;
+};
+
 /** Standard LSP diagnostic severities. */
 enum class lsp_diagnostic_severity : int
 {

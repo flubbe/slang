@@ -16,6 +16,7 @@
 #include "../src/lsp/json_rpc.h"
 #include "../src/lsp/document_store.h"
 #include "../src/lsp/diagnostics.h"
+#include "../src/lsp/navigation.h"
 
 namespace
 {
@@ -666,6 +667,110 @@ TEST(lsp, diagnostics_clear_on_empty)
     ASSERT_EQ(parsed.method, "textDocument/publishDiagnostics");
     ASSERT_TRUE(parsed.params_json.has_value());
     ASSERT_TRUE(parsed.params_json->find("\"diagnostics\":[]") != std::string::npos);
+}
+
+/* Phase 6.1 Navigation tests */
+
+TEST(lsp, document_symbols_extraction)
+{
+    std::string source =
+      "fn add(a: i32, b: i32) -> i32 {\n"
+      "    let sum: i32 = a + b;\n"
+      "    return sum;\n"
+      "}\n"
+      "struct Point { x: i32, y: i32 };\n"
+      "const MAX_COUNT: i32 = 999;\n";
+
+    auto symbols = slang::lsp::compute_document_symbols(source);
+    ASSERT_EQ(symbols.size(), 3);
+
+    // 1. Function 'add'
+    EXPECT_EQ(symbols[0].name, "add");
+    EXPECT_EQ(symbols[0].kind, slang::lsp::symbol_kind::function);
+    ASSERT_EQ(symbols[0].children.size(), 3);
+    EXPECT_EQ(symbols[0].children[0].name, "a");
+    EXPECT_EQ(symbols[0].children[0].kind, slang::lsp::symbol_kind::variable);
+    EXPECT_EQ(symbols[0].children[1].name, "b");
+    EXPECT_EQ(symbols[0].children[1].kind, slang::lsp::symbol_kind::variable);
+    EXPECT_EQ(symbols[0].children[2].name, "sum");
+    EXPECT_EQ(symbols[0].children[2].kind, slang::lsp::symbol_kind::variable);
+
+    // 2. Struct 'Point'
+    EXPECT_EQ(symbols[1].name, "Point");
+    EXPECT_EQ(symbols[1].kind, slang::lsp::symbol_kind::struct_);
+    ASSERT_EQ(symbols[1].children.size(), 2);
+    EXPECT_EQ(symbols[1].children[0].name, "x");
+    EXPECT_EQ(symbols[1].children[0].kind, slang::lsp::symbol_kind::field);
+    EXPECT_EQ(symbols[1].children[1].name, "y");
+    EXPECT_EQ(symbols[1].children[1].kind, slang::lsp::symbol_kind::field);
+
+    // 3. Constant 'MAX_COUNT'
+    EXPECT_EQ(symbols[2].name, "MAX_COUNT");
+    EXPECT_EQ(symbols[2].kind, slang::lsp::symbol_kind::constant);
+
+    // Verify JSON serialization
+    std::string json = slang::lsp::format_document_symbols_result(symbols);
+    EXPECT_TRUE(json.find("\"name\":\"add\"") != std::string::npos);
+    EXPECT_TRUE(json.find("\"name\":\"Point\"") != std::string::npos);
+    EXPECT_TRUE(json.find("\"name\":\"sum\"") != std::string::npos);
+    EXPECT_TRUE(json.find("\"kind\":23") != std::string::npos);    // struct
+    EXPECT_TRUE(json.find("\"kind\":12") != std::string::npos);    // function
+}
+
+TEST(lsp, go_to_definition)
+{
+    std::string source =
+      "fn helper(x: i32) -> i32 { return x * 2; }\n"
+      "fn main() -> i32 { return helper(42); }\n";
+
+    const std::string uri = "file:///workspace/test.sl";
+
+    // Position on 'helper' call in main (Line 1, character 28)
+    slang::lsp::lsp_position call_pos{.line = 1, .character = 28};
+    auto def_loc = slang::lsp::find_definition(uri, source, call_pos);
+
+    ASSERT_TRUE(def_loc.has_value());
+    EXPECT_EQ(def_loc->uri, uri);
+    // Definition is 'fn helper' on Line 0
+    EXPECT_EQ(def_loc->range.start.line, 0);
+    EXPECT_EQ(def_loc->range.start.character, 3);    // 'helper' starts at index 3
+
+    // Position on whitespace
+    slang::lsp::lsp_position whitespace_pos{.line = 1, .character = 0};
+    auto none_loc = slang::lsp::find_definition(uri, source, whitespace_pos);
+    EXPECT_FALSE(none_loc.has_value());
+}
+
+TEST(lsp, find_references)
+{
+    std::string source =
+      "fn compute(n: i32) -> i32 { return n + 1; }\n"
+      "fn main() -> i32 {\n"
+      "    let a: i32 = compute(10);\n"
+      "    let b: i32 = compute(20);\n"
+      "    return a + b;\n"
+      "}\n";
+
+    const std::string uri = "file:///workspace/test.sl";
+
+    // Position on 'compute' declaration (Line 0, character 4)
+    slang::lsp::lsp_position decl_pos{.line = 0, .character = 4};
+
+    // References including declaration (1 def + 2 calls = 3)
+    auto refs_with_decl = slang::lsp::find_references(uri, source, decl_pos, true);
+    EXPECT_EQ(refs_with_decl.size(), 3);
+
+    // References excluding declaration (2 calls)
+    auto refs_without_decl = slang::lsp::find_references(uri, source, decl_pos, false);
+    EXPECT_EQ(refs_without_decl.size(), 2);
+    for(const auto& r: refs_without_decl)
+    {
+        EXPECT_NE(r.range.start.line, 0);    // None on line 0 (declaration)
+    }
+
+    // Verify JSON serialization
+    std::string json = slang::lsp::format_references_result(refs_with_decl);
+    EXPECT_TRUE(json.find("\"uri\":\"file:///workspace/test.sl\"") != std::string::npos);
 }
 
 }    // namespace
