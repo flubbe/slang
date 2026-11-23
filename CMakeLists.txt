@@ -141,6 +141,7 @@ set(SOURCES
     src/commandline/format.cpp
     src/commandline/lsp.cpp
     src/lsp/lsp_transport.cpp
+    src/lsp/json_rpc.cpp
     src/commandline/run.cpp
     src/commandline/runtime.cpp
     src/filemanager.cpp

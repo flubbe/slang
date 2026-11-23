@@ -14,9 +14,8 @@
 #include <print>
 #include <string>
 
-#include <simdjson.h>
-
 #include "lsp/lsp_transport.h"
+#include "lsp/json_rpc.h"
 #include "commandline.h"
 
 namespace slang::commandline
@@ -29,107 +28,123 @@ namespace
 class lsp_server
 {
     bool running{true};
+    slang::lsp::transport transport{std::cin, std::cout};
+    slang::lsp::message_parser parser;
 
     /**
      * Handle a single JSON-RPC message body.
      *
      * Examines the `method` field and dispatches to the
-     * appropriate handler.  Updates `running` to `false`
+     * appropriate handler. Updates `running` to `false`
      * when the server should shut down (e.g. `exit`,
      * `shutdown`).
      */
     void handle_message(std::string_view body)
     {
-        simdjson::dom::parser parser;
-        auto result = parser.parse(body);
+        auto msg = parser.parse(body);
 
-        if(result.error())
+        if(!msg.is_valid())
         {
             std::println(
               stderr,
-              "[lsp] JSON parse error: {}",
-              simdjson::error_message(result.error()));
+              "[lsp] Invalid JSON-RPC message: {}",
+              msg.error.message);
             return;
         }
 
-        auto doc = result.value();
-
-        // Extract the `method` field (notifications lack it; its absence
-        // simply means we have no handler for this message).
-        auto method = doc["method"].get_string();
-        if(method.error())
-            return;
-
-        const std::string_view method_name = method.value();
-
-        // `id` is present on requests (requires a response) but absent on
-        // notifications (expect an empty result).
-        auto id = doc["id"];
-
-        if(method_name == "initialize")
+        if(msg.is_request())
         {
-            std::println(stderr, "[lsp] Initializing.");
-            auto id_result = id.get_int64();
-
-            // Build the response with the original request ID (if it was an
-            // integer ID; otherwise null).
-            std::string response;
-            response = "{\"jsonrpc\":\"2.0\"";
-            if(id_result.error() == simdjson::error_code::SUCCESS)
+            if(msg.method == "initialize")
             {
-                response += std::format(
-                  ",\"id\":{}",
-                  id_result.value());
+                std::println(stderr, "[lsp] Initializing.");
+
+                std::string response = "{\"jsonrpc\":\"2.0\"";
+                if(msg.id.has_value())
+                {
+                    std::visit(
+                      [&response](const auto& id_val)
+                      {
+                          using T = std::decay_t<decltype(id_val)>;
+                          if constexpr(std::is_same_v<T, std::int64_t>)
+                          {
+                              response += std::format(",\"id\":{}", id_val);
+                          }
+                          else
+                          {
+                              response += std::format(",\"id\":\"{}\"", id_val);
+                          }
+                      },
+                      *msg.id);
+                }
+                else
+                {
+                    response += R"(,"id":null)";
+                }
+                response += R"(,"result":{"capabilities":{}}})";
+
+                transport.send_message(response);
+            }
+            else if(msg.method == "shutdown")
+            {
+                std::println(stderr, "[lsp] Shutting down.");
+                running = false;
+
+                std::string response = "{\"jsonrpc\":\"2.0\"";
+                if(msg.id.has_value())
+                {
+                    std::visit(
+                      [&response](const auto& id_val)
+                      {
+                          using T = std::decay_t<decltype(id_val)>;
+                          if constexpr(std::is_same_v<T, std::int64_t>)
+                          {
+                              response += std::format(",\"id\":{}", id_val);
+                          }
+                          else
+                          {
+                              response += std::format(",\"id\":\"{}\"", id_val);
+                          }
+                      },
+                      *msg.id);
+                }
+                else
+                {
+                    response += R"(,"id":null)";
+                }
+                response += R"(,"result":null})";
+
+                transport.send_message(response);
             }
             else
             {
-                response += R"(,"id":null)";
+                std::println(
+                  stderr,
+                  "[lsp] Unknown request method: {}",
+                  msg.method);
             }
-            response += R"(,"result":{"capabilities":{}}})";
-
-            auto header = std::format(
-              "Content-Length: {}\r\n\r\n",
-              response.size());
-
-            std::fputs(header.c_str(), stdout);
-            std::fputs(response.c_str(), stdout);
-            std::fflush(stdout);
         }
-        else if(method_name == "initialized")
+        else if(msg.is_notification())
         {
-            // Initialization is complete.
-            std::println(stderr, "[lsp] Initialized.");
-        }
-        else if(method_name == "shutdown")
-        {
-            std::println(stderr, "[lsp] Shutting down.");
-            running = false;
-
-            std::string response =
-              R"({"jsonrpc":"2.0","id":null,"result":null})";
-            std::string header = std::format(
-              "Content-Length: {}\r\n\r\n",
-              response.size());
-
-            std::fputs(header.c_str(), stdout);
-            std::fputs(response.c_str(), stdout);
-            std::fflush(stdout);
-        }
-        else if(method_name == "exit")
-        {
-            std::println(stderr, "[lsp] Exiting.");
-            running = false;
-        }
-        else if(method_name == "$/setTrace")
-        {
-            std::println(stderr, "[lsp] Received $/setTrace.");
-        }
-        else
-        {
-            std::println(
-              stderr,
-              "[lsp] Unknown method: {}",
-              std::string{method_name});
+            if(msg.method == "initialized")
+            {
+                std::println(stderr, "[lsp] Initialized.");
+            }
+            else if(msg.method == "exit")
+            {
+                std::println(stderr, "[lsp] Exiting.");
+                running = false;
+            }
+            else if(msg.method == "$/setTrace")
+            {
+                std::println(stderr, "[lsp] Received $/setTrace.");
+            }
+            else
+            {
+                std::println(
+                  stderr,
+                  "[lsp] Unknown notification method: {}",
+                  msg.method);
+            }
         }
     }
 
@@ -137,16 +152,12 @@ public:
     /**
      * Enter the LSP read-loop.
      *
-     * Reads from `std::cin`, writes to `std::cout`.  Exits when `exit` is
+     * Reads from `std::cin`, writes to `std::cout`. Exits when `exit` is
      * received, when the input is exhausted (EOF), or when a protocol error
      * makes reading impossible.
      */
     void serve()
     {
-        detail::lsp_transport transport{
-          static_cast<void*>(&std::cin),
-          static_cast<void*>(&std::cout)};
-
         std::println(stderr,
                      "[lsp] Server starting");
 

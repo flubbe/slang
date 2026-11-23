@@ -14,16 +14,18 @@
 
 #include "lsp/lsp_transport.h"
 
-namespace slang::commandline::detail
+namespace slang::lsp
 {
 
-bool lsp_transport::read_message(
+bool transport::read_message(
   std::string& body)
 {
-    // Cast the void* stored in the class to
-    // the correct base stream type.
-    std::istream* in_stream =
-      static_cast<std::istream*>(in);
+    if(in == nullptr)
+    {
+        return false;
+    }
+
+    std::istream* in_stream = in;
 
     std::string line;
     std::size_t content_length{0};
@@ -150,11 +152,15 @@ bool lsp_transport::read_message(
     return true;
 }
 
-void lsp_transport::send_message(
+void transport::send_message(
   std::string_view body)
 {
-    std::ostream* out_stream =
-      static_cast<std::ostream*>(out);
+    if(out == nullptr)
+    {
+        return;
+    }
+
+    std::ostream* out_stream = out;
 
     std::string header;
     header.reserve(32);
@@ -167,4 +173,4 @@ void lsp_transport::send_message(
     out_stream->flush();
 }
 
-}    // namespace slang::commandline::detail
+}    // namespace slang::lsp

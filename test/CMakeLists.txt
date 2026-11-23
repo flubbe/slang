@@ -88,6 +88,7 @@ add_gtest_executable(test_package
 
 add_gtest_executable(test_lsp
     ../src/lsp/lsp_transport.cpp
+    ../src/lsp/json_rpc.cpp
     lsp/test_lsp.cpp
 )
 target_include_directories(test_lsp
@@ -98,6 +99,7 @@ target_link_libraries(test_lsp
     PRIVATE
     GTest::gtest
     GTest::gtest_main
+    simdjson::simdjson
 )
 
 add_gtest_executable(test_diagnostics diagnostics/test_diagnostics.cpp)

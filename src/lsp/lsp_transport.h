@@ -17,9 +17,7 @@
 #include <string>
 #include <string_view>
 
-namespace slang::commandline
-{
-namespace detail
+namespace slang::lsp
 {
 
 /**
@@ -28,20 +26,24 @@ namespace detail
  * Provides `Content-Length` header parsing and message body
  * I/O over injected `std::istream` / `std::ostream` pairs.
  */
-class lsp_transport
+class transport
 {
 public:
     /**
-     * Construct for a given input and output stream.
-     *
-     * The `in` and `out` arguments are stored as `void*` and
-     * recast to the correct base types in methods.
-     * This lets tests use any `std::istringstream*` /
-     * `std::ostringstream*` combination.
+     * Construct for a given input and output stream reference.
      */
-    lsp_transport(void* in, void* out)
-    : in{in}
-    , out{out}
+    transport(std::istream& in, std::ostream& out)
+    : in{&in}
+    , out{&out}
+    {
+    }
+
+    /**
+     * Backward-compatible constructor accepting raw pointers.
+     */
+    transport(void* in, void* out)
+    : in{static_cast<std::istream*>(in)}
+    , out{static_cast<std::ostream*>(out)}
     {
     }
 
@@ -67,9 +69,13 @@ public:
     void send_message(std::string_view body);
 
 private:
-    void* in = nullptr;
-    void* out = nullptr;
+    std::istream* in{nullptr};
+    std::ostream* out{nullptr};
 };
 
-}    // namespace detail
-}    // namespace slang::commandline
+}    // namespace slang::lsp
+
+namespace slang::commandline::detail
+{
+    using lsp_transport = slang::lsp::transport;
+}
