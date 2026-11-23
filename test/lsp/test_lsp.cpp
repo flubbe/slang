@@ -10,6 +10,7 @@
 
 #include <gtest/gtest.h>
 
+#include <print>
 #include <sstream>
 
 #include "../src/lsp/lsp_transport.h"
