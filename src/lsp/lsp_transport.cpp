@@ -10,6 +10,7 @@
 
 #include <cstring>
 #include <format>
+#include <print>
 #include <string>
 
 #include "lsp/lsp_transport.h"
