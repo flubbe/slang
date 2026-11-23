@@ -194,4 +194,81 @@ incoming_message parse_message(std::string_view json_str)
     return parser.parse(json_str);
 }
 
+std::string escape_json_string(std::string_view str)
+{
+    std::string out;
+    out.reserve(str.size() + 8);
+    for(char c: str)
+    {
+        switch(c)
+        {
+        case '"': out += "\\\""; break;
+        case '\\': out += "\\\\"; break;
+        case '\b': out += "\\b"; break;
+        case '\f': out += "\\f"; break;
+        case '\n': out += "\\n"; break;
+        case '\r': out += "\\r"; break;
+        case '\t': out += "\\t"; break;
+        default:
+            if(static_cast<unsigned char>(c) < 0x20)
+            {
+                out += std::format("\\u{:04x}", static_cast<unsigned int>(static_cast<unsigned char>(c)));
+            }
+            else
+            {
+                out.push_back(c);
+            }
+            break;
+        }
+    }
+    return out;
+}
+
+static std::string format_id(const request_id& id)
+{
+    return std::visit(
+      [](const auto& val) -> std::string
+      {
+          using T = std::decay_t<decltype(val)>;
+          if constexpr(std::is_same_v<T, std::int64_t>)
+          {
+              return std::format("{}", val);
+          }
+          else
+          {
+              return std::format("\"{}\"", escape_json_string(val));
+          }
+      },
+      id);
+}
+
+std::string make_response(const request_id& id, std::string_view result_json)
+{
+    return std::format(
+      "{{\"jsonrpc\":\"2.0\",\"id\":{},\"result\":{}}}",
+      format_id(id),
+      result_json.empty() ? "null" : result_json);
+}
+
+std::string make_error_response(
+  const std::optional<request_id>& id,
+  error_code code,
+  std::string_view message)
+{
+    std::string id_str = id.has_value() ? format_id(*id) : "null";
+    return std::format(
+      "{{\"jsonrpc\":\"2.0\",\"id\":{},\"error\":{{\"code\":{},\"message\":\"{}\"}}}}",
+      id_str,
+      static_cast<int>(code),
+      escape_json_string(message));
+}
+
+std::string make_notification(std::string_view method, std::string_view params_json)
+{
+    return std::format(
+      "{{\"jsonrpc\":\"2.0\",\"method\":\"{}\",\"params\":{}}}",
+      escape_json_string(method),
+      params_json.empty() ? "{}" : params_json);
+}
+
 }    // namespace slang::lsp

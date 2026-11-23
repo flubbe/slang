@@ -123,4 +123,19 @@ private:
  */
 incoming_message parse_message(std::string_view json_str);
 
+/** Escape a string for safe embedding inside a JSON string literal. */
+std::string escape_json_string(std::string_view str);
+
+/** Format a successful JSON-RPC 2.0 response. */
+std::string make_response(const request_id& id, std::string_view result_json);
+
+/** Format an error JSON-RPC 2.0 response. */
+std::string make_error_response(
+  const std::optional<request_id>& id,
+  error_code code,
+  std::string_view message);
+
+/** Format a JSON-RPC 2.0 notification from server to client. */
+std::string make_notification(std::string_view method, std::string_view params_json);
+
 }    // namespace slang::lsp
