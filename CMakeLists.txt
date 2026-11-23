@@ -140,6 +140,7 @@ set(SOURCES
     src/commandline/disassemble.cpp
     src/commandline/format.cpp
     src/commandline/lsp.cpp
+    src/lsp/lsp_transport.cpp
     src/commandline/run.cpp
     src/commandline/runtime.cpp
     src/filemanager.cpp

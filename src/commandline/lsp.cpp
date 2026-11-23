@@ -1,7 +1,7 @@
 /**
  * slang - a simple scripting language.
  *
- * `lsp` command implementation (Language Server).
+ * `lsp` command implementation — Language server.
  *
  * \author Felix Lubbe
  * \copyright Copyright (c) 2026
@@ -10,12 +10,14 @@
 
 #include <cstdio>
 #include <iostream>
+#include <format>
 #include <print>
 #include <string>
 
-#include "commandline.h"
-
 #include <simdjson.h>
+
+#include "lsp/lsp_transport.h"
+#include "commandline.h"
 
 namespace slang::commandline
 {
@@ -23,148 +25,147 @@ namespace slang::commandline
 namespace
 {
 
+/** LSP server. */
 class lsp_server
 {
     bool running{true};
 
     /**
-     * Read one LSP message from stdin.
+     * Handle a single JSON-RPC message body.
      *
-     * Messages consist of headers terminated by CRLF, followed by
-     * a blank line and a body of Content-Length bytes.
+     * Examines the `method` field and dispatches to the
+     * appropriate handler.  Updates `running` to `false`
+     * when the server should shut down (e.g. `exit`,
+     * `shutdown`).
      */
-    bool read_message(std::string& message)
-    {
-        std::string header;
-        std::size_t content_length = 0;
-
-        while(std::getline(std::cin, header))
-        {
-            // std::getline removes '\n', but leaves '\r'.
-            if(header == "\r" || header.empty())
-            {
-                break;
-            }
-
-            constexpr std::string_view content_length_header =
-              "Content-Length:";
-
-            if(header.starts_with(content_length_header))
-            {
-                auto value = header.substr(content_length_header.size());
-
-                content_length = std::stoull(value);
-            }
-        }
-
-        if(std::cin.eof() && header.empty())
-        {
-            return false;
-        }
-
-        if(content_length == 0)
-        {
-            std::println(stderr, "[lsp] Invalid or missing Content-Length.");
-            return false;
-        }
-
-        message.resize(content_length);
-
-        std::cin.read(message.data(),
-                      static_cast<std::streamsize>(content_length));
-
-        if(std::cin.gcount() != static_cast<std::streamsize>(content_length))
-        {
-            std::println(stderr, "[lsp] Incomplete message body.");
-            return false;
-        }
-
-        return true;
-    }
-
-    /** Write one JSON-RPC response to stdout. */
-    void send_response(std::string_view response)
-    {
-        std::println(stdout,
-                     "Content-Length: {}\r",
-                     response.size());
-
-        std::print(stdout, "\r\n");
-        std::print(stdout, "{}", response);
-
-        std::fflush(stdout);
-    }
-
-    /** Parse and handle an incoming JSON-RPC message. */
-    void handle_message(const std::string& message)
+    void handle_message(std::string_view body)
     {
         simdjson::dom::parser parser;
-        auto result = parser.parse(message);
+        auto result = parser.parse(body);
 
         if(result.error())
         {
-            std::println(stderr,
-                         "[lsp] JSON parse error: {}",
-                         simdjson::error_message(result.error()));
+            std::println(
+              stderr,
+              "[lsp] JSON parse error: {}",
+              simdjson::error_message(result.error()));
             return;
         }
 
         auto doc = result.value();
 
+        // Extract the `method` field (notifications lack it; its absence
+        // simply means we have no handler for this message).
         auto method = doc["method"].get_string();
         if(method.error())
-        {
             return;
-        }
 
         const std::string_view method_name = method.value();
 
-        // Requests have an ID and require a response.
+        // `id` is present on requests (requires a response) but absent on
+        // notifications (expect an empty result).
         auto id = doc["id"];
 
         if(method_name == "initialize")
         {
             std::println(stderr, "[lsp] Initializing.");
+            auto id_result = id.get_int64();
 
-            send_response(
-              R"({"jsonrpc":"2.0","id":)" + std::to_string(id.get_int64().value()) + R"(,"result":{"capabilities":{}}})");
+            // Build the response with the original request ID (if it was an
+            // integer ID; otherwise null).
+            std::string response;
+            response = "{\"jsonrpc\":\"2.0\"";
+            if(id_result.error() == simdjson::error_code::SUCCESS)
+            {
+                response += std::format(
+                  ",\"id\":{}",
+                  id_result.value());
+            }
+            else
+            {
+                response += R"(,"id":null)";
+            }
+            response += R"(,"result":{"capabilities":{}}})";
+
+            auto header = std::format(
+              "Content-Length: {}\r\n\r\n",
+              response.size());
+
+            std::fputs(header.c_str(), stdout);
+            std::fputs(response.c_str(), stdout);
+            std::fflush(stdout);
+        }
+        else if(method_name == "initialized")
+        {
+            // Initialization is complete.
+            std::println(stderr, "[lsp] Initialized.");
         }
         else if(method_name == "shutdown")
         {
             std::println(stderr, "[lsp] Shutting down.");
-
-            send_response(
-              R"({"jsonrpc":"2.0","id":)" + std::to_string(id.get_int64().value()) + R"(,"result":null})");
-
             running = false;
+
+            std::string response =
+              R"({"jsonrpc":"2.0","id":null,"result":null})";
+            std::string header = std::format(
+              "Content-Length: {}\r\n\r\n",
+              response.size());
+
+            std::fputs(header.c_str(), stdout);
+            std::fputs(response.c_str(), stdout);
+            std::fflush(stdout);
         }
         else if(method_name == "exit")
         {
+            std::println(stderr, "[lsp] Exiting.");
             running = false;
+        }
+        else if(method_name == "$/setTrace")
+        {
+            std::println(stderr, "[lsp] Received $/setTrace.");
+        }
+        else
+        {
+            std::println(
+              stderr,
+              "[lsp] Unknown method: {}",
+              std::string{method_name});
         }
     }
 
 public:
+    /**
+     * Enter the LSP read-loop.
+     *
+     * Reads from `std::cin`, writes to `std::cout`.  Exits when `exit` is
+     * received, when the input is exhausted (EOF), or when a protocol error
+     * makes reading impossible.
+     */
     void serve()
     {
-        std::println(stderr, "[lsp] Server starting.");
+        detail::lsp_transport transport{
+          static_cast<void*>(&std::cin),
+          static_cast<void*>(&std::cout)};
+
+        std::println(stderr,
+                     "[lsp] Server starting");
 
         while(running)
         {
-            std::string message;
-
-            if(!read_message(message))
-            {
+            std::string body;
+            if(!transport.read_message(body))
                 break;
-            }
 
-            std::println(stderr, "[lsp] Received message:");
-            std::println(stderr, "{}", message);
+            std::println(
+              stderr,
+              "[lsp] Received message:\n{}\n",
+              body);
 
-            handle_message(message);
+            handle_message(body);
         }
 
-        std::println(stderr, "[lsp] Server stopped.");
+        std::println(stderr,
+                     "[lsp] Server stopped");
     }
 };
 
@@ -180,8 +181,7 @@ void lsp::invoke(const std::vector<std::string>& args)
     cxxopts::Options options = make_cxxopts_options();
 
     options.add_options()(
-      "s,server",
-      "Run as LSP server.");
+      "s,server", "Run as LSP server.");
 
     auto result = parse_args(options, args);
 
@@ -192,8 +192,8 @@ void lsp::invoke(const std::vector<std::string>& args)
     }
     else
     {
-        std::print("{}", options.help());
-        std::print("\nUsage: slang lsp --server\n");
+        std::println(stderr, "{}", options.help());
+        std::println(stderr, "Usage: slang lsp --server");
     }
 }
 

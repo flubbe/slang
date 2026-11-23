@@ -86,6 +86,20 @@ add_gtest_executable(test_package
     ../src/utils.cpp
 )
 
+add_gtest_executable(test_lsp
+    ../src/lsp/lsp_transport.cpp
+    lsp/test_lsp.cpp
+)
+target_include_directories(test_lsp
+    PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test_lsp
+    PRIVATE
+    GTest::gtest
+    GTest::gtest_main
+)
+
 add_gtest_executable(test_diagnostics diagnostics/test_diagnostics.cpp)
 target_link_libraries(test_diagnostics PRIVATE slang_test_frontend_core)
 
