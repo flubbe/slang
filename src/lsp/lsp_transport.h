@@ -77,5 +77,5 @@ private:
 
 namespace slang::commandline::detail
 {
-    using lsp_transport = slang::lsp::transport;
+using lsp_transport = slang::lsp::transport;
 }
