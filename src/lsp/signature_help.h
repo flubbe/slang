@@ -22,15 +22,15 @@ namespace slang::lsp
 /** Parameter information for a function. */
 struct signature_parameter
 {
-    std::string name;       // Parameter name (or "argN" if unnamed)
-    std::string type;       // Parameter type (e.g. "i32")
+    std::string name;    // Parameter name (or "argN" if unnamed)
+    std::string type;    // Parameter type (e.g. "i32")
 };
 
 /** A function signature for signature help. */
 struct signature_info
 {
-    std::string label;          // e.g. "fn foo(i32 a, i32 b)"
-    std::string label_detail;   // The function name (e.g. "foo")
+    std::string label;           // e.g. "fn foo(i32 a, i32 b)"
+    std::string label_detail;    // The function name (e.g. "foo")
     std::vector<signature_parameter> parameters;
 };
 
@@ -46,9 +46,9 @@ struct signature_info
  * @return Signature info if a function call is detected at `pos`, otherwise `nullopt`.
  */
 std::optional<signature_info> get_signature_help(
-    [[maybe_unused]] const std::string& uri,
-    const std::string& source,
-    lsp_position pos);
+  [[maybe_unused]] const std::string& uri,
+  const std::string& source,
+  lsp_position pos);
 
 /**
  * Serialize a signature help result as a JSON-RPC `SignatureHelp` object.
@@ -57,6 +57,6 @@ std::optional<signature_info> get_signature_help(
  * @return A JSON string for `textDocument/signatureHelp`.
  */
 std::string format_signature_help_result(
-    const std::optional<signature_info>& sig);
+  const std::optional<signature_info>& sig);
 
-} // namespace slang::lsp
+}    // namespace slang::lsp

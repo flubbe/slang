@@ -34,8 +34,6 @@ static lsp_range range_of_token(const slang::token& tok)
       .end = {.line = line, .character = col + len}};
 }
 
-
-
 static std::string format_range(const lsp_range& r)
 {
     return std::format(
@@ -489,7 +487,7 @@ std::optional<lsp_location> find_definition(
                         // Offset ranges to the line where the symbol was found in the external file.
                         std::optional<std::size_t> offsetLine;
                         const auto* fileTok = find_token_at(fileStream.data(),
-                            lsp_position{.line = 0, .character = 0});
+                                                            lsp_position{.line = 0, .character = 0});
                         if(fileTok)
                         {
                             offsetLine = fileTok->location.line - 1;

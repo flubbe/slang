@@ -25,8 +25,8 @@ namespace
 
 /// Extract the function name at `pos` by scanning backwards for an identifier.
 static std::string extract_function_name(
-    const std::string& source,
-    lsp_position pos)
+  const std::string& source,
+  lsp_position pos)
 {
     std::string func_name;
     std::size_t col = pos.character;
@@ -49,12 +49,12 @@ static std::string extract_function_name(
     return func_name;
 }
 
-} /// namespace
+}    // namespace
 
 std::optional<signature_info> get_signature_help(
-    [[maybe_unused]] const std::string& uri,
-    const std::string& source,
-    lsp_position pos)
+  [[maybe_unused]] const std::string& uri,
+  const std::string& source,
+  lsp_position pos)
 {
     /// Extract the function name at `pos`.
     std::string func_name = extract_function_name(source, pos);
@@ -97,7 +97,7 @@ std::optional<signature_info> get_signature_help(
 }
 
 std::string format_signature_help_result(
-    const std::optional<signature_info>& sig)
+  const std::optional<signature_info>& sig)
 {
     if(!sig.has_value())
         return std::string{"{}"};
@@ -106,7 +106,7 @@ std::string format_signature_help_result(
     result += "{\"label\":\"";
 
     /// Escape label.
-    for(char c : sig->label)
+    for(char c: sig->label)
     {
         if(c == '"')
             result += "\\\"";
@@ -118,10 +118,10 @@ std::string format_signature_help_result(
     result += "\",\"parameters\":[";
 
     /// Escape parameters.
-    for(const auto& param : sig->parameters)
+    for(const auto& param: sig->parameters)
     {
         result += "{\"name\":\"";
-        for(char c : param.name)
+        for(char c: param.name)
         {
             if(c == '"')
                 result += "\\\"";
@@ -131,7 +131,7 @@ std::string format_signature_help_result(
                 result += c;
         }
         result += "\",\"type\":\"";
-        for(char c : param.type)
+        for(char c: param.type)
         {
             if(c == '"')
                 result += "\\\"";
@@ -147,4 +147,4 @@ std::string format_signature_help_result(
     return result;
 }
 
-} /// namespace slang::lsp
+}    // namespace slang::lsp

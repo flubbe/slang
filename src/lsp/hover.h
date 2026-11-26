@@ -22,10 +22,10 @@ namespace slang::lsp
 /** An LSP hover item. */
 struct hover_item
 {
-    std::string label;        // e.g. "x" or "fn foo"
-    std::string detail;       // e.g. "i32" or "fn(i32 a) -> i32"
-    std::string kind;         // e.g. "let", "const", "function", etc.
-    std::optional<lsp_location> definition; // optional: where this symbol is defined
+    std::string label;                         // e.g. "x" or "fn foo"
+    std::string detail;                        // e.g. "i32" or "fn(i32 a) -> i32"
+    std::string kind;                          // e.g. "let", "const", "function", etc.
+    std::optional<lsp_location> definition;    // optional: where this symbol is defined
 };
 
 /**
@@ -41,10 +41,10 @@ struct hover_item
  * @return Hover info if a typeable symbol is found at `pos`, otherwise `nullopt`.
  */
 std::optional<hover_item> find_hover_info(
-    const std::string& uri,
-    const std::string& source,
-    lsp_position pos,
-    const std::vector<std::string>& search_paths = {});
+  const std::string& uri,
+  const std::string& source,
+  lsp_position pos,
+  const std::vector<std::string>& search_paths = {});
 
 /**
  * Serialize a hover item as a JSON-RPC `MarkupContent` result.
@@ -54,4 +54,4 @@ std::optional<hover_item> find_hover_info(
  */
 std::string format_hover_result(const std::optional<hover_item>& item);
 
-} // namespace slang::lsp
+}    // namespace slang::lsp
