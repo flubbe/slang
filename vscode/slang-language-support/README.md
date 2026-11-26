@@ -18,7 +18,7 @@ Press `F5` in VS Code to launch an Extension Development Host.
 To build and install the extension, use
 
 ```bash
-npm install -g vsce
+npm install -g @vscode/vsce
 vsce package
 ```
 

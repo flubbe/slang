@@ -72,11 +72,18 @@ std::string format_document_symbols_result(const std::vector<document_symbol>& s
 
 /**
  * Locate the definition of the symbol at the given position.
+ *
+ * @param uri Document URI.
+ * @param source Document source code.
+ * @param pos Cursor position to look up.
+ * @param searchPaths Additional directories to search for .sl files.
+ * @return Location of the symbol definition, or nullopt if not found.
  */
 std::optional<lsp_location> find_definition(
   const std::string& uri,
   const std::string& source,
-  lsp_position pos);
+  lsp_position pos,
+  const std::vector<std::string>& searchPaths);
 
 /**
  * Serialize definition result to a JSON result string (Location or null).

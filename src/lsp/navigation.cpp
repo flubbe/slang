@@ -9,6 +9,8 @@
  */
 
 #include <format>
+#include <fstream>
+#include <filesystem>
 #include <memory>
 #include <vector>
 
@@ -21,7 +23,7 @@
 namespace slang::lsp
 {
 
-static lsp_range token_to_range(const slang::token& tok)
+static lsp_range range_of_token(const slang::token& tok)
 {
     std::size_t line = (tok.location.line > 0) ? (tok.location.line - 1) : 0;
     std::size_t col = (tok.location.col > 0) ? (tok.location.col - 1) : 0;
@@ -32,16 +34,7 @@ static lsp_range token_to_range(const slang::token& tok)
       .end = {.line = line, .character = col + len}};
 }
 
-static lsp_range node_to_range(const slang::ast::expression* expr)
-{
-    const auto& loc = expr->get_location();
-    std::size_t line = (loc.line > 0) ? (loc.line - 1) : 0;
-    std::size_t col = (loc.col > 0) ? (loc.col - 1) : 0;
 
-    return lsp_range{
-      .start = {.line = line, .character = col},
-      .end = {.line = line, .character = col + 1}};
-}
 
 static std::string format_range(const lsp_range& r)
 {
@@ -101,8 +94,8 @@ std::vector<document_symbol> compute_document_symbols(const std::string& source)
                 document_symbol sym{
                   .name = proto->get_name(),
                   .kind = symbol_kind::function,
-                  .range = node_to_range(fe),
-                  .selection_range = token_to_range(proto->get_name_token()),
+                  .range = range_of_token(proto->get_name_token()),
+                  .selection_range = range_of_token(proto->get_name_token()),
                   .children = {}};
 
                 for(const auto& arg: proto->get_args())
@@ -111,8 +104,8 @@ std::vector<document_symbol> compute_document_symbols(const std::string& source)
                     sym.children.push_back(document_symbol{
                       .name = tok.s,
                       .kind = symbol_kind::variable,
-                      .range = token_to_range(tok),
-                      .selection_range = token_to_range(tok),
+                      .range = range_of_token(tok),
+                      .selection_range = range_of_token(tok),
                       .children = {}});
                 }
 
@@ -128,8 +121,8 @@ std::vector<document_symbol> compute_document_symbols(const std::string& source)
                                 sym.children.push_back(document_symbol{
                                   .name = vde->get_name(),
                                   .kind = symbol_kind::variable,
-                                  .range = node_to_range(vde),
-                                  .selection_range = token_to_range(vde->get_name_token()),
+                                  .range = range_of_token(vde->get_name_token()),
+                                  .selection_range = range_of_token(vde->get_name_token()),
                                   .children = {}});
                             }
                         }
@@ -145,8 +138,8 @@ std::vector<document_symbol> compute_document_symbols(const std::string& source)
             document_symbol sym{
               .name = sde->get_name(),
               .kind = symbol_kind::struct_,
-              .range = node_to_range(sde),
-              .selection_range = token_to_range(sde->get_name_token()),
+              .range = range_of_token(sde->get_name_token()),
+              .selection_range = range_of_token(sde->get_name_token()),
               .children = {}};
 
             for(const auto* member: sde->get_children())
@@ -157,8 +150,8 @@ std::vector<document_symbol> compute_document_symbols(const std::string& source)
                     sym.children.push_back(document_symbol{
                       .name = ne->get_name(),
                       .kind = symbol_kind::field,
-                      .range = token_to_range(ne->get_name_token()),
-                      .selection_range = token_to_range(ne->get_name_token()),
+                      .range = range_of_token(ne->get_name_token()),
+                      .selection_range = range_of_token(ne->get_name_token()),
                       .children = {}});
                 }
             }
@@ -173,8 +166,8 @@ std::vector<document_symbol> compute_document_symbols(const std::string& source)
                 symbols.push_back(document_symbol{
                   .name = vde->get_name(),
                   .kind = symbol_kind::variable,
-                  .range = node_to_range(vde),
-                  .selection_range = token_to_range(vde->get_name_token()),
+                  .range = range_of_token(vde->get_name_token()),
+                  .selection_range = range_of_token(vde->get_name_token()),
                   .children = {}});
             }
         }
@@ -186,8 +179,8 @@ std::vector<document_symbol> compute_document_symbols(const std::string& source)
                 symbols.push_back(document_symbol{
                   .name = cde->get_name(),
                   .kind = symbol_kind::constant,
-                  .range = node_to_range(cde),
-                  .selection_range = token_to_range(cde->get_name_token()),
+                  .range = range_of_token(cde->get_name_token()),
+                  .selection_range = range_of_token(cde->get_name_token()),
                   .children = {}});
             }
         }
@@ -261,7 +254,8 @@ static const slang::token* find_token_at(const std::vector<slang::token>& tokens
 std::optional<lsp_location> find_definition(
   const std::string& uri,
   const std::string& source,
-  lsp_position pos)
+  lsp_position pos,
+  const std::vector<std::string>& searchPaths)
 {
     if(source.empty())
     {
@@ -316,7 +310,7 @@ std::optional<lsp_location> find_definition(
                 {
                     if(proto->get_name() == target_name)
                     {
-                        found_range = token_to_range(proto->get_name_token());
+                        found_range = range_of_token(proto->get_name_token());
                         return;
                     }
                     for(const auto& arg: proto->get_args())
@@ -324,7 +318,7 @@ std::optional<lsp_location> find_definition(
                         const auto& arg_tok = std::get<0>(arg);
                         if(arg_tok.s == target_name)
                         {
-                            found_range = token_to_range(arg_tok);
+                            found_range = range_of_token(arg_tok);
                             return;
                         }
                     }
@@ -335,7 +329,7 @@ std::optional<lsp_location> find_definition(
                 const auto* sde = static_cast<const slang::ast::struct_definition_expression*>(expr);
                 if(sde->get_name() == target_name)
                 {
-                    found_range = token_to_range(sde->get_name_token());
+                    found_range = range_of_token(sde->get_name_token());
                     return;
                 }
                 for(const auto* member: sde->get_children())
@@ -345,7 +339,7 @@ std::optional<lsp_location> find_definition(
                         const auto* ne = member->as_named_expression();
                         if(ne->get_name() == target_name)
                         {
-                            found_range = token_to_range(ne->get_name_token());
+                            found_range = range_of_token(ne->get_name_token());
                             return;
                         }
                     }
@@ -357,7 +351,7 @@ std::optional<lsp_location> find_definition(
                 const auto* ne = expr->as_named_expression();
                 if(ne && ne->get_name() == target_name)
                 {
-                    found_range = token_to_range(ne->get_name_token());
+                    found_range = range_of_token(ne->get_name_token());
                     return;
                 }
             }
@@ -372,6 +366,144 @@ std::optional<lsp_location> find_definition(
         if(found_range.has_value())
         {
             return lsp_location{.uri = uri, .range = *found_range};
+        }
+    }
+
+    // Fallback: search configured directories for .sl files containing the symbol.
+    if(!searchPaths.empty() && !target_name.empty())
+    {
+        std::filesystem::path current_file{std::filesystem::path{uri}.filename()};
+        for(const auto& basePath: searchPaths)
+        {
+            std::filesystem::path base{basePath};
+            if(!std::filesystem::exists(base))
+                continue;
+
+            std::error_code ec;
+            for(const auto& entry: std::filesystem::directory_iterator(base, ec))
+            {
+                if(ec)
+                    break;
+                if(!entry.is_directory())
+                    continue;
+
+                const std::string& dirName = entry.path().filename().string();
+                if(dirName.size() < 6 || dirName.back() != 's')
+                    continue;
+
+                // Try .sl file in the directory.
+                std::filesystem::path slPath = entry.path() / (dirName.substr(0, dirName.size() - 1) + ".sl");
+                std::filesystem::path cmodPath = entry.path() / (dirName.substr(0, dirName.size() - 1) + ".cmod");
+
+                std::string fileSource;
+                if(std::filesystem::exists(slPath, ec))
+                {
+                    std::ifstream slFile(slPath, std::ios::binary);
+                    fileSource.assign(std::istreambuf_iterator<char>(slFile), std::istreambuf_iterator<char>());
+                }
+                else if(std::filesystem::exists(cmodPath, ec))
+                {
+                    std::ifstream cmodFile(cmodPath, std::ios::binary);
+                    fileSource.assign(std::istreambuf_iterator<char>(cmodFile), std::istreambuf_iterator<char>());
+                }
+                else
+                {
+                    continue;
+                }
+
+                if(fileSource.empty())
+                    continue;
+
+                slang::token_stream fileStream;
+                try
+                {
+                    fileStream = slang::lexer::lex(fileSource);
+                }
+                catch(...)
+                {
+                    continue;
+                }
+
+                std::shared_ptr<slang::ast::expression> fileRoot;
+                try
+                {
+                    auto fileCopy = fileStream;
+                    slang::parser fileParser;
+                    fileParser.parse(std::move(fileCopy));
+                    fileRoot = fileParser.get_ast();
+                }
+                catch(...)
+                {
+                    continue;
+                }
+
+                if(fileRoot)
+                {
+                    std::optional<lsp_range> fileFoundRange;
+                    auto fileSearch = [&](const slang::ast::expression* expr, auto& self) -> void
+                    {
+                        if(!expr || fileFoundRange.has_value())
+                            return;
+
+                        auto id = expr->get_id();
+                        if(id == slang::ast::node_identifier::function_expression)
+                        {
+                            const auto* fe = static_cast<const slang::ast::function_expression*>(expr);
+                            const auto* proto = fe->get_prototype();
+                            if(proto && proto->get_name() == target_name)
+                            {
+                                fileFoundRange = range_of_token(proto->get_name_token());
+                                return;
+                            }
+                        }
+                        else if(id == slang::ast::node_identifier::struct_definition_expression)
+                        {
+                            const auto* sde = static_cast<const slang::ast::struct_definition_expression*>(expr);
+                            if(sde->get_name() == target_name)
+                            {
+                                fileFoundRange = range_of_token(sde->get_name_token());
+                                return;
+                            }
+                        }
+                        else if(id == slang::ast::node_identifier::variable_declaration_expression
+                                || id == slang::ast::node_identifier::constant_declaration_expression)
+                        {
+                            const auto* ne = expr->as_named_expression();
+                            if(ne && ne->get_name() == target_name)
+                            {
+                                fileFoundRange = range_of_token(ne->get_name_token());
+                                return;
+                            }
+                        }
+
+                        for(const auto* child: expr->get_children())
+                        {
+                            self(child, self);
+                        }
+                    };
+
+                    fileSearch(fileRoot.get(), fileSearch);
+                    if(fileFoundRange.has_value())
+                    {
+                        std::string fileUri = "file://" + entry.path().string();
+                        // Offset ranges to the line where the symbol was found in the external file.
+                        std::optional<std::size_t> offsetLine;
+                        const auto* fileTok = find_token_at(fileStream.data(),
+                            lsp_position{.line = 0, .character = 0});
+                        if(fileTok)
+                        {
+                            offsetLine = fileTok->location.line - 1;
+                        }
+                        if(offsetLine.has_value())
+                        {
+                            lsp_range adjustedRange = *fileFoundRange;
+                            adjustedRange.start.line += *offsetLine;
+                            adjustedRange.end.line += *offsetLine;
+                            return lsp_location{.uri = fileUri, .range = adjustedRange};
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -421,13 +553,13 @@ std::vector<lsp_location> find_references(
 
     const std::string& target_name = target_tok->s;
 
-    auto def_loc = find_definition(uri, source, pos);
+    auto def_loc = find_definition(uri, source, pos, {});
 
     for(const auto& tok: stream.data())
     {
         if(tok.type == slang::token_type::identifier && tok.s == target_name)
         {
-            auto range = token_to_range(tok);
+            auto range = range_of_token(tok);
             if(!include_declaration && def_loc.has_value())
             {
                 if(range.start.line == def_loc->range.start.line

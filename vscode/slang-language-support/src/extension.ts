@@ -25,6 +25,25 @@ function getServerPath(): string {
     return config.get<string>("languageServer.path", "slang");
 }
 
+function getSearchPaths(): string[] {
+    const config = workspace.getConfiguration("slang");
+    const configuredPaths = config.get<string[]>("searchPaths", []);
+    const workspacePaths = (workspace.workspaceFolders ?? []).map(
+        folder => folder.uri.fsPath
+    );
+    return [...workspacePaths, ...configuredPaths];
+}
+
+function syncSearchPaths(): void {
+    client.sendNotification("workspace/didChangeConfiguration", {
+        settings: {
+            slang: {
+                searchPaths: getSearchPaths()
+            }
+        }
+    });
+}
+
 export function activate(context: ExtensionContext) {
     const serverPath = getServerPath();
 
@@ -65,7 +84,15 @@ export function activate(context: ExtensionContext) {
         clientOptions
     );
 
-    client.start();
+    void client.start().then(syncSearchPaths);
+    context.subscriptions.push(
+        workspace.onDidChangeConfiguration(event => {
+            if (event.affectsConfiguration("slang.searchPaths")) {
+                syncSearchPaths();
+            }
+        }),
+        workspace.onDidChangeWorkspaceFolders(syncSearchPaths)
+    );
     context.subscriptions.push(client);
 }
 

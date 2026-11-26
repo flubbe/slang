@@ -145,6 +145,9 @@ set(SOURCES
     src/lsp/document_store.cpp
     src/lsp/diagnostics.cpp
     src/lsp/navigation.cpp
+    src/lsp/hover.cpp
+    src/lsp/completion.cpp
+    src/lsp/signature_help.cpp
     src/commandline/run.cpp
     src/commandline/runtime.cpp
     src/filemanager.cpp

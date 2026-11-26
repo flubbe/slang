@@ -19,6 +19,9 @@
 #include "lsp/document_store.h"
 #include "lsp/diagnostics.h"
 #include "lsp/navigation.h"
+#include "lsp/hover.h"
+#include "lsp/completion.h"
+#include "lsp/signature_help.h"
 #include "commandline.h"
 
 namespace slang::commandline
@@ -45,6 +48,7 @@ class lsp_server
     slang::lsp::transport transport{std::cin, std::cout};
     slang::lsp::message_parser parser;
     slang::lsp::document_store docs;
+    std::vector<std::string> searchPaths;
 
     /**
      * Handle a single JSON-RPC message body.
@@ -108,7 +112,7 @@ class lsp_server
 
             // Advertise supported capabilities.
             std::string result =
-              R"({"capabilities":{"textDocumentSync":1,"documentSymbolProvider":true,"definitionProvider":true,"referencesProvider":true},"serverInfo":{"name":"slang-lsp","version":"0.1.0"}})";
+              R"({"capabilities":{"textDocumentSync":1,"documentSymbolProvider":true,"definitionProvider":true,"referencesProvider":true,"hoverProvider":true,"completionProvider":{"triggerCharacters":["."]},"signatureHelpProvider":{"triggerCharacters":["(",","]},"configurationProvider":true,"workspace":{"workspaceFolders":{"supported":true}}},"serverInfo":{"name":"slang-lsp","version":"0.1.0"}})";
 
             transport.send_message(
               slang::lsp::make_response(*msg.id, result));
@@ -132,6 +136,26 @@ class lsp_server
         else if(msg.method == "textDocument/references")
         {
             handle_references(msg);
+        }
+        else if(msg.method == "textDocument/hover")
+        {
+            handle_hover(msg);
+        }
+        else if(msg.method == "textDocument/completion")
+        {
+            handle_completion(msg);
+        }
+        else if(msg.method == "textDocument/signatureHelp")
+        {
+            handle_signature_help(msg);
+        }
+        else if(msg.method == "workspace/didChangeConfiguration")
+        {
+            handle_did_change_configuration(msg);
+        }
+        else if(msg.method == "workspace/configuration")
+        {
+            handle_workspace_configuration(msg);
         }
         else
         {
@@ -223,7 +247,7 @@ class lsp_server
           .line = static_cast<std::size_t>(line.value()),
           .character = static_cast<std::size_t>(character.value())};
 
-        auto loc = slang::lsp::find_definition(uri_str, doc->text, pos);
+        auto loc = slang::lsp::find_definition(uri_str, doc->text, pos, searchPaths);
         transport.send_message(
           slang::lsp::make_response(*msg.id, slang::lsp::format_definition_result(loc)));
     }
@@ -277,6 +301,140 @@ class lsp_server
         auto refs = slang::lsp::find_references(uri_str, doc->text, pos, include_decl);
         transport.send_message(
           slang::lsp::make_response(*msg.id, slang::lsp::format_references_result(refs)));
+    }
+
+    void handle_hover(const slang::lsp::incoming_message& msg)
+    {
+        if(!msg.params_json.has_value())
+        {
+            transport.send_message(slang::lsp::make_response(*msg.id, "{}"));
+            return;
+        }
+
+        simdjson::dom::parser doc_parser;
+        auto result = doc_parser.parse(*msg.params_json);
+        if(result.error() != simdjson::error_code::SUCCESS)
+        {
+            transport.send_message(slang::lsp::make_response(*msg.id, "{}"));
+            return;
+        }
+
+        auto uri = result["textDocument"]["uri"].get_string();
+        auto line = result["position"]["line"].get_int64();
+        auto character = result["position"]["character"].get_int64();
+
+        if(uri.error() != simdjson::error_code::SUCCESS || line.error() != simdjson::error_code::SUCCESS
+           || character.error() != simdjson::error_code::SUCCESS)
+        {
+            transport.send_message(slang::lsp::make_response(*msg.id, "{}"));
+            return;
+        }
+
+        std::string uri_str{uri.value()};
+        const auto* doc = docs.get(uri_str);
+        if(!doc)
+        {
+            std::println(stderr, "doc not found");
+
+            transport.send_message(slang::lsp::make_response(*msg.id, "{}"));
+            return;
+        }
+
+        slang::lsp::lsp_position pos{
+          .line = static_cast<std::size_t>(line.value()),
+          .character = static_cast<std::size_t>(character.value())};
+
+        auto hover = slang::lsp::find_hover_info(uri_str, doc->text, pos, searchPaths);
+        transport.send_message(
+          slang::lsp::make_response(*msg.id, slang::lsp::format_hover_result(hover)));
+    }
+
+    void handle_completion(const slang::lsp::incoming_message& msg)
+    {
+        if(!msg.params_json.has_value())
+        {
+            transport.send_message(slang::lsp::make_response(*msg.id, "[]"));
+            return;
+        }
+
+        simdjson::dom::parser doc_parser;
+        auto result = doc_parser.parse(*msg.params_json);
+        if(result.error() != simdjson::error_code::SUCCESS)
+        {
+            transport.send_message(slang::lsp::make_response(*msg.id, "[]"));
+            return;
+        }
+
+        auto uri = result["textDocument"]["uri"].get_string();
+        auto line = result["position"]["line"].get_int64();
+        auto character = result["position"]["character"].get_int64();
+
+        if(uri.error() != simdjson::error_code::SUCCESS || line.error() != simdjson::error_code::SUCCESS
+           || character.error() != simdjson::error_code::SUCCESS)
+        {
+            transport.send_message(slang::lsp::make_response(*msg.id, "[]"));
+            return;
+        }
+
+        std::string uri_str{uri.value()};
+        const auto* doc = docs.get(uri_str);
+        if(!doc)
+        {
+            transport.send_message(slang::lsp::make_response(*msg.id, "[]"));
+            return;
+        }
+
+        slang::lsp::lsp_position pos{
+          .line = static_cast<std::size_t>(line.value()),
+          .character = static_cast<std::size_t>(character.value())};
+
+        auto completions = slang::lsp::get_completions(uri_str, doc->text, pos);
+        transport.send_message(
+          slang::lsp::make_response(*msg.id, slang::lsp::format_completion_result(completions)));
+    }
+
+    void handle_signature_help(const slang::lsp::incoming_message& msg)
+    {
+        if(!msg.params_json.has_value())
+        {
+            transport.send_message(slang::lsp::make_response(*msg.id, "{}"));
+            return;
+        }
+
+        simdjson::dom::parser doc_parser;
+        auto result = doc_parser.parse(*msg.params_json);
+        if(result.error() != simdjson::error_code::SUCCESS)
+        {
+            transport.send_message(slang::lsp::make_response(*msg.id, "{}"));
+            return;
+        }
+
+        auto uri = result["textDocument"]["uri"].get_string();
+        auto line = result["position"]["line"].get_int64();
+        auto character = result["position"]["character"].get_int64();
+
+        if(uri.error() != simdjson::error_code::SUCCESS || line.error() != simdjson::error_code::SUCCESS
+           || character.error() != simdjson::error_code::SUCCESS)
+        {
+            transport.send_message(slang::lsp::make_response(*msg.id, "{}"));
+            return;
+        }
+
+        std::string uri_str{uri.value()};
+        const auto* doc = docs.get(uri_str);
+        if(!doc)
+        {
+            transport.send_message(slang::lsp::make_response(*msg.id, "{}"));
+            return;
+        }
+
+        slang::lsp::lsp_position pos{
+          .line = static_cast<std::size_t>(line.value()),
+          .character = static_cast<std::size_t>(character.value())};
+
+        auto sig = slang::lsp::get_signature_help(uri_str, doc->text, pos);
+        transport.send_message(
+          slang::lsp::make_response(*msg.id, slang::lsp::format_signature_help_result(sig)));
     }
 
     void handle_notification(const slang::lsp::incoming_message& msg)
@@ -404,6 +562,111 @@ class lsp_server
         // Clear diagnostics upon closure.
         transport.send_message(
           slang::lsp::format_publish_diagnostics(uri_str, {}));
+    }
+
+    void handle_did_change_configuration(const slang::lsp::incoming_message& msg)
+    {
+        if(!msg.params_json.has_value())
+            return;
+
+        simdjson::dom::parser doc_parser;
+        auto result = doc_parser.parse(*msg.params_json);
+        if(result.error() != simdjson::error_code::SUCCESS)
+            return;
+
+        auto settings = result["settings"].get_object();
+        if(settings.error() != simdjson::error_code::SUCCESS)
+            return;
+
+        auto slang_settings = settings["slang"].get_object();
+        simdjson::dom::array paths;
+        bool has_search_paths = false;
+        if(slang_settings.error() == simdjson::error_code::SUCCESS)
+        {
+            auto configured_paths = slang_settings["searchPaths"].get_array();
+            if(configured_paths.error() == simdjson::error_code::SUCCESS)
+            {
+                paths = configured_paths.value();
+                has_search_paths = true;
+            }
+        }
+        else
+        {
+            auto configured_paths = settings["slang.searchPaths"].get_array();
+            if(configured_paths.error() == simdjson::error_code::SUCCESS)
+            {
+                paths = configured_paths.value();
+                has_search_paths = true;
+            }
+        }
+        if(!has_search_paths)
+            return;
+
+        std::vector<std::string> updated_paths;
+        for(auto value: paths)
+        {
+            auto path = value.get_string();
+            if(path.error() == simdjson::error_code::SUCCESS)
+                updated_paths.emplace_back(path.value());
+        }
+
+        searchPaths = std::move(updated_paths);
+        std::println(stderr, "[lsp] Updated {} search paths", searchPaths.size());
+    }
+
+    void handle_workspace_configuration(const slang::lsp::incoming_message& msg)
+    {
+        if(!msg.params_json.has_value())
+        {
+            transport.send_message(slang::lsp::make_response(*msg.id, "[]"));
+            return;
+        }
+
+        simdjson::dom::parser doc_parser;
+        auto result = doc_parser.parse(*msg.params_json);
+        if(result.error() != simdjson::error_code::SUCCESS)
+        {
+            transport.send_message(slang::lsp::make_response(*msg.id, "[]"));
+            return;
+        }
+
+        auto items = result.get_array();
+        if(items.error() != simdjson::error_code::SUCCESS)
+        {
+            transport.send_message(slang::lsp::make_response(*msg.id, "[]"));
+            return;
+        }
+
+        std::string resultJson = "[";
+        bool first = true;
+
+        for(auto item: items.value())
+        {
+            auto section = item["section"].get_string();
+            if(section.error() != simdjson::error_code::SUCCESS)
+                continue;
+
+            std::string sectionStr{section.value()};
+            if(sectionStr == "slang" || sectionStr == "slang.searchPaths")
+            {
+                if(!first)
+                    resultJson += ",";
+                first = false;
+                resultJson += "[";
+                bool firstPath = true;
+                for(const auto& sp: searchPaths)
+                {
+                    if(!firstPath)
+                        resultJson += ",";
+                    firstPath = false;
+                    resultJson += std::format("\"{}\"", slang::lsp::escape_json_string(sp));
+                }
+                resultJson += "]";
+            }
+        }
+
+        resultJson += "]";
+        transport.send_message(slang::lsp::make_response(*msg.id, resultJson));
     }
 
 public:

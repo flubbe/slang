@@ -86,25 +86,7 @@ add_gtest_executable(test_package
     ../src/utils.cpp
 )
 
-add_gtest_executable(test_lsp
-    ../src/lsp/lsp_transport.cpp
-    ../src/lsp/json_rpc.cpp
-    ../src/lsp/document_store.cpp
-    ../src/lsp/diagnostics.cpp
-    ../src/lsp/navigation.cpp
-    lsp/test_lsp.cpp
-)
-target_include_directories(test_lsp
-    PRIVATE
-    ${PROJECT_SOURCE_DIR}/src
-)
-target_link_libraries(test_lsp
-    PRIVATE
-    slang_test_frontend_core
-    GTest::gtest
-    GTest::gtest_main
-    simdjson::simdjson
-)
+add_subdirectory(lsp)
 
 add_gtest_executable(test_diagnostics diagnostics/test_diagnostics.cpp)
 target_link_libraries(test_diagnostics PRIVATE slang_test_frontend_core)
@@ -670,5 +652,26 @@ list(FILTER TEST_FILES EXCLUDE REGEX "/test/fail/")
 add_test(
     NAME "check formatting (test)"
     COMMAND slang fmt --check ${TEST_FILES}
+)
+
+# -----------------------------------------------------------------------
+#  LSP integration tests (Python)
+# -----------------------------------------------------------------------
+
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+
+add_test(
+    NAME lsp_hover_e2e
+    COMMAND
+        ${CMAKE_COMMAND} -E env
+        "SLANG_EXE_PATH=$<TARGET_FILE:slang>"
+        ${Python3_EXECUTABLE} -m pytest -q
+        ${CMAKE_CURRENT_SOURCE_DIR}/lsp
+)
+set_tests_properties(
+    lsp_hover_e2e
+    PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
+        TIMEOUT 30
 )
 set_tests_properties("check formatting (test)" PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..)

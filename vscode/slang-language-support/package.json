@@ -1,6 +1,7 @@
 {
   "name": "slang-language-support",
   "displayName": "Slang Language Support",
+  "publisher": "flubbe",
   "description": "Language support for the Slang scripting language",
   "version": "0.1.0",
   "repository": {
@@ -43,6 +44,14 @@
           "type": "string",
           "default": "slang",
           "description": "Path to the slang language server binary (e.g. 'slang' or '/path/to/slang')"
+        },
+        "slang.searchPaths": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "description": "Additional search paths for .sl source files used by the language server"
         }
       }
     }
