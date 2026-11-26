@@ -1,25 +1,72 @@
 {
   "name": "slang-language-support",
   "displayName": "Slang Language Support",
-  "description": "Support for the scripting language",
-  "version": "0.0.1",
+  "publisher": "flubbe",
+  "description": "Language support for the Slang scripting language",
+  "version": "0.1.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/flubbe/slang.git"
+  },
+  "license": "MIT",
   "engines": {
-    "vscode": "^1.116.0"
+    "vscode": "^1.85.0"
   },
   "categories": [
-    "Programming Languages"
+    "Programming Languages",
+    "Snippets"
   ],
   "contributes": {
-    "languages": [{
-      "id": "slang-scripting",
-      "aliases": ["Slang", "slang-scripting"],
-      "extensions": [".sl"],
-      "configuration": "./language-configuration.json"
-    }],
-    "grammars": [{
-      "language": "slang-scripting",
-      "scopeName": "source.slang",
-      "path": "./syntaxes/slang-scripting.tmLanguage.json"
-    }]
+    "languages": [
+      {
+        "id": "slang-scripting",
+        "aliases": [
+          "Slang",
+          "slang-scripting"
+        ],
+        "extensions": [
+          ".sl"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "slang-scripting",
+        "scopeName": "source.slang",
+        "path": "./syntaxes/slang-scripting.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "title": "Slang",
+      "properties": {
+        "slang.languageServer.path": {
+          "type": "string",
+          "default": "slang",
+          "description": "Path to the slang language server binary (e.g. 'slang' or '/path/to/slang')"
+        },
+        "slang.searchPaths": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "description": "Additional search paths for .sl source files used by the language server"
+        }
+      }
+    }
+  },
+  "main": "./out/extension.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^16.x",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.9.3"
   }
 }

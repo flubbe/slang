@@ -35,6 +35,16 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install Python test dependencies
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install -r requirements-test.txt
+
       - name: Setup GCC 14 (Linux)
         if: matrix.compiler_family == 'gcc'
         run: |
@@ -88,7 +98,10 @@ jobs:
       - name: Configure CMake
         # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
         # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
-        run: cmake --preset ${{matrix.conan_preset}} -DSLANG_BUILD_C_BINDINGS=ON
+        run: >
+          cmake --preset ${{matrix.conan_preset}}
+          -DSLANG_BUILD_C_BINDINGS=ON
+          -DPython3_EXECUTABLE=${{ github.workspace }}/.venv/bin/python
 
       - name: Build
         run: cmake --build --preset ${{matrix.conan_preset}}

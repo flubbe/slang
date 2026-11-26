@@ -1269,6 +1269,20 @@ public:
         return lhs.get();
     }
 
+    /** Get the right-hand side expression. */
+    [[nodiscard]]
+    expression* get_right_expression()
+    {
+        return rhs.get();
+    }
+
+    /** Get the right-hand side expression. */
+    [[nodiscard]]
+    const expression* get_right_expression() const
+    {
+        return rhs.get();
+    }
+
     /**
      * Return the accessed struct's type info.
      *
@@ -2897,6 +2911,13 @@ public:
     {
         return return_type_id;
     }
+
+    /** Return the argument list. */
+    [[nodiscard]]
+    const auto& get_args() const
+    {
+        return args;
+    }
 };
 
 /** AST of a code block. */
@@ -3103,6 +3124,20 @@ public:
     ty::type_id get_return_type_id() const
     {
         return prototype->get_return_type_id();
+    }
+
+    /** Return the function prototype. */
+    [[nodiscard]]
+    const prototype_ast* get_prototype() const
+    {
+        return prototype.get();
+    }
+
+    /** Return the function body. */
+    [[nodiscard]]
+    const block* get_body() const
+    {
+        return body.get();
     }
 };
 

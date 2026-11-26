@@ -53,6 +53,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 find_package(cxxopts REQUIRED)
 find_package(Microsoft.GSL REQUIRED)
+find_package(simdjson REQUIRED)
 
 option(SLANG_BUILD_C_BINDINGS "Build C bindings (default OFF)" OFF)
 
@@ -138,6 +139,15 @@ set(SOURCES
     src/commandline/compile.cpp
     src/commandline/disassemble.cpp
     src/commandline/format.cpp
+    src/commandline/lsp.cpp
+    src/lsp/lsp_transport.cpp
+    src/lsp/json_rpc.cpp
+    src/lsp/document_store.cpp
+    src/lsp/diagnostics.cpp
+    src/lsp/navigation.cpp
+    src/lsp/hover.cpp
+    src/lsp/completion.cpp
+    src/lsp/signature_help.cpp
     src/commandline/run.cpp
     src/commandline/runtime.cpp
     src/filemanager.cpp
@@ -174,9 +184,12 @@ endif()
 
 add_executable(slang ${SOURCES})
 target_link_libraries(slang
+    PRIVATE
     slang_shared_core
     cxxopts::cxxopts
-    Microsoft.GSL::GSL)
+    Microsoft.GSL::GSL
+    simdjson::simdjson
+)
 
 add_subdirectory(examples)
 add_subdirectory(test)

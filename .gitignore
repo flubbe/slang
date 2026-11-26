@@ -11,6 +11,8 @@
 /**/.DS_Store
 
 .env
-/out
+out/
 
 /**/*.vsix
+
+__pycache__
