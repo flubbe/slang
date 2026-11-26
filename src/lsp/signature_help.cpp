@@ -118,8 +118,13 @@ std::string format_signature_help_result(
     result += "\",\"parameters\":[";
 
     /// Escape parameters.
-    for(const auto& param: sig->parameters)
+    for(std::size_t i = 0; i < sig->parameters.size(); ++i)
     {
+        if(i > 0)
+        {
+            result += ",";
+        }
+        const auto& param = sig->parameters[i];
         result += "{\"name\":\"";
         for(char c: param.name)
         {

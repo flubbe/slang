@@ -19,8 +19,6 @@
 namespace
 {
 
-/* === Phase 5.1: Severity mapping === */
-
 TEST(diagnostics, severity_mapping)
 {
     using comp_sev = slang::compiler::diagnostics::severity;
@@ -50,8 +48,6 @@ TEST(diagnostics, range_conversion)
     EXPECT_EQ(range.end.character, 12);
 }
 
-/* === Phase 5.1: Diagnostic computation === */
-
 TEST(diagnostics, clean_source_produces_no_errors)
 {
     const std::string source = "fn main() -> int { return 0; }";
@@ -72,8 +68,6 @@ TEST(diagnostics, syntax_error_produces_diagnostic)
     EXPECT_FALSE(diags[0].message.empty());
     EXPECT_EQ(diags[0].source, "slang");
 }
-
-/* === Phase 5.1: Publish diagnostics === */
 
 TEST(diagnostics, publish_notification_format)
 {

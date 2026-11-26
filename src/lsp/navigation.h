@@ -10,11 +10,18 @@
 
 #pragma once
 
+#include <filesystem>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "lsp/diagnostics.h"
+
+namespace slang
+{
+class file_manager;
+}    // namespace slang
 
 namespace slang::lsp
 {
@@ -103,5 +110,25 @@ std::vector<lsp_location> find_references(
  * Serialize references result to a JSON result string.
  */
 std::string format_references_result(const std::vector<lsp_location>& locations);
+
+/**
+ * Convert a filesystem path to a `file://` URI.
+ */
+std::string file_uri_from_path(const std::filesystem::path& path);
+
+/**
+ * Configure a `file_manager` with default and user-provided search paths.
+ */
+void configure_search_paths(
+  slang::file_manager& file_manager,
+  const std::string& uri,
+  const std::vector<std::string>& search_paths);
+
+/**
+ * Resolve the `.sl` source file path for a module qualified name (e.g. `math` or `a::b`).
+ */
+std::optional<std::filesystem::path> resolve_module_source_path(
+  const slang::file_manager& file_manager,
+  std::string_view module_qualified_name);
 
 }    // namespace slang::lsp

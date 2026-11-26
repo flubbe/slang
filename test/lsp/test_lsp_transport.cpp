@@ -43,8 +43,6 @@ static bool read_from_wire(
     return transport.read_message(body);
 }
 
-/* --- Phase 1.1: Message framing --- */
-
 /* Send message tests. */
 
 TEST(lsp, send_single_message)
@@ -213,8 +211,6 @@ TEST(lsp, read_different_body_sizes)
       body,
       "{\"jsonrpc\":\"2.0\"}");
 }
-
-/* --- Phase 1.3: Separate transport from server logic --- */
 
 /* Error handling tests. */
 

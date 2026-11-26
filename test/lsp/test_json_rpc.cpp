@@ -17,8 +17,6 @@
 namespace
 {
 
-/* === Phase 2.1: Message parser === */
-
 TEST(json_rpc, parse_valid_request)
 {
     const std::string json =
@@ -93,7 +91,7 @@ TEST(json_rpc, handle_string_ids)
     EXPECT_EQ(std::get<std::string>(*msg.id), "request-abc-123");
 }
 
-/* === Invalid / malformed requests === */
+/* Invalid / malformed requests */
 
 TEST(json_rpc, handle_missing_jsonrpc_field)
 {
@@ -175,7 +173,7 @@ TEST(json_rpc, handle_non_object_root)
     EXPECT_EQ(msg.error.code, slang::lsp::error_code::invalid_request);
 }
 
-/* === Malformed JSON === */
+/* Malformed JSON */
 
 TEST(json_rpc, handle_incomplete_json)
 {
@@ -192,8 +190,6 @@ TEST(json_rpc, handle_trailing_garbage)
     EXPECT_FALSE(msg.is_valid());
     EXPECT_EQ(msg.error.code, slang::lsp::error_code::parse_error);
 }
-
-/* === Phase 2.2: Response formatting === */
 
 TEST(json_rpc, parse_response_with_result)
 {

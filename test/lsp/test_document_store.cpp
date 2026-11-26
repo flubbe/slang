@@ -17,8 +17,6 @@
 namespace
 {
 
-/* === Phase 4.1: Document lifecycle === */
-
 TEST(document_store, open_and_get)
 {
     slang::lsp::document_store store;
@@ -81,8 +79,6 @@ TEST(document_store, close_again_fails)
     EXPECT_FALSE(store.did_close(uri));
 }
 
-/* === Phase 4.2: Multiple documents === */
-
 TEST(document_store, multiple_documents_independent)
 {
     slang::lsp::document_store store;
@@ -101,6 +97,17 @@ TEST(document_store, multiple_documents_independent)
     EXPECT_EQ(store.size(), 1U);
     EXPECT_FALSE(store.contains("file:///doc1.sl"));
     EXPECT_TRUE(store.contains("file:///doc2.sl"));
+}
+
+TEST(document_store, rejects_stale_document_version)
+{
+    slang::lsp::document_store store;
+    const std::string uri = "file:///stale.sl";
+
+    store.did_open(uri, 5, "v5");
+    EXPECT_FALSE(store.did_change(uri, 4, "v4"));
+    EXPECT_EQ(store.get(uri)->version, 5);
+    EXPECT_EQ(store.get(uri)->text, "v5");
 }
 
 }    // namespace

@@ -1269,6 +1269,20 @@ public:
         return lhs.get();
     }
 
+    /** Get the right-hand side expression. */
+    [[nodiscard]]
+    expression* get_right_expression()
+    {
+        return rhs.get();
+    }
+
+    /** Get the right-hand side expression. */
+    [[nodiscard]]
+    const expression* get_right_expression() const
+    {
+        return rhs.get();
+    }
+
     /**
      * Return the accessed struct's type info.
      *

@@ -29,6 +29,11 @@ bool document_store::did_change(const std::string& uri, std::int64_t version, st
         return false;
     }
 
+    if(version < it->second.version)
+    {
+        return false;
+    }
+
     it->second.version = version;
     it->second.text = std::move(text);
     return true;

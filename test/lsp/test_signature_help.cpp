@@ -18,8 +18,6 @@
 namespace
 {
 
-/* === Phase 6.2: Signature help — basic === */
-
 TEST(signature_help, detect_function_call)
 {
     std::string source =
@@ -41,8 +39,6 @@ TEST(signature_help, empty_source_returns_none)
       "file:///test.sl", "", {});
     EXPECT_FALSE(sig.has_value());
 }
-
-/* === Phase 6.2: Signature help — result formatting === */
 
 TEST(signature_help, format_empty_result)
 {

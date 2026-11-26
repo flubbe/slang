@@ -9,9 +9,9 @@
  */
 
 #include <algorithm>
-#include <charconv>
 #include <filesystem>
 #include <format>
+#include <fstream>
 #include <optional>
 #include <print>
 #include <string>
@@ -114,6 +114,24 @@ const ast::expression* find_expression_at(
         }
     }
 
+    if(expr->get_id() == ast::node_identifier::access_expression)
+    {
+        const auto* access = expr->as_access_expression();
+        if(const auto* found = find_expression_at(access->get_left_expression(), pos))
+        {
+            return found;
+        }
+        const auto* rhs = access->get_right_expression();
+        if(rhs && rhs->is_named_expression())
+        {
+            const auto* named = rhs->as_named_expression();
+            if(named && token_position_matches(named->get_name_token(), pos))
+            {
+                return expr;
+            }
+        }
+    }
+
     for(const ast::expression* child: expr->get_children())
     {
         if(const auto* found = find_expression_at(child, pos))
@@ -125,80 +143,80 @@ const ast::expression* find_expression_at(
     return nullptr;
 }
 
-std::optional<fs::path> path_from_file_uri(
-  std::string_view uri)
+std::optional<std::string> format_const_value(
+  const const_::const_info& info)
 {
-    constexpr std::string_view prefix{"file://"};
-    if(!uri.starts_with(prefix))
+    if(std::holds_alternative<std::int64_t>(info.value))
     {
-        return std::nullopt;
+        return std::to_string(std::get<std::int64_t>(info.value));
     }
-
-    std::string path{uri.substr(prefix.size())};
-    if(path.starts_with("localhost/"))
+    if(std::holds_alternative<double>(info.value))
     {
-        path.erase(
-          0,
-          std::string_view{"localhost"}.size());
+        return std::format("{}", std::get<double>(info.value));
     }
-
-    std::string decoded;
-    decoded.reserve(path.size());
-    for(std::size_t i = 0; i < path.size(); ++i)
+    if(std::holds_alternative<std::string>(info.value))
     {
-        if(path[i] != '%')
-        {
-            decoded += path[i];
-            continue;
-        }
-
-        if(i + 2 >= path.size())
-        {
-            return std::nullopt;
-        }
-
-        unsigned int value = 0;
-        const char* first = path.data() + i + 1;
-        const char* last = first + 2;
-        const auto [end, error] = std::from_chars(first, last, value, 16);
-        if(error != std::errc{} || end != last)
-        {
-            return std::nullopt;
-        }
-
-        decoded += static_cast<char>(value);
-        i += 2;
+        return std::format("\"{}\"", std::get<std::string>(info.value));
     }
-
-#if defined(_WIN32)
-    // Remove leading slash from URI-decoded Windows drive-letter paths.
-    if(decoded.size() >= 3
-       && decoded[0] == '/'
-       && decoded[2] == ':')
-    {
-        decoded.erase(0, 1);
-    }
-#endif
-
-    return fs::path{decoded};
+    return std::nullopt;
 }
 
-void add_search_path(
-  slang::file_manager& file_manager,
-  const fs::path& path)
+const ast::function_expression* find_function_in_ast(
+  const ast::expression* expr,
+  std::string_view name)
 {
-    std::error_code error;
-    if(!fs::is_directory(path, error)
-       || error)
+    if(!expr)
     {
-        return;
+        return nullptr;
     }
 
-    const fs::path canonical_path = fs::canonical(path, error);
-    if(!error)
+    if(expr->get_id() == ast::node_identifier::function_expression)
     {
-        file_manager.add_search_path(canonical_path);
+        const auto* fn = static_cast<const ast::function_expression*>(expr);
+        if(fn->get_prototype() && fn->get_prototype()->get_name() == name)
+        {
+            return fn;
+        }
     }
+
+    for(const ast::expression* child: expr->get_children())
+    {
+        if(const auto* found = find_function_in_ast(child, name))
+        {
+            return found;
+        }
+    }
+
+    return nullptr;
+}
+
+const ast::expression* find_constant_in_ast(
+  const ast::expression* expr,
+  std::string_view name)
+{
+    if(!expr)
+    {
+        return nullptr;
+    }
+
+    if(expr->get_id() == ast::node_identifier::constant_declaration_expression)
+    {
+        const auto* named = expr->as_named_expression();
+        if(named && named->get_name() == name)
+        {
+            return expr;
+        }
+    }
+
+    for(const ast::expression* child: expr->get_children())
+    {
+        if(const auto* found = find_constant_in_ast(child, name))
+        {
+            return found;
+        }
+    }
+
+    return nullptr;
 }
 
 std::string display_type(
@@ -415,22 +433,7 @@ std::optional<hover_item> find_hover_info(
     }
 
     slang::file_manager file_manager;
-    std::error_code error;
-    const fs::path current_path = fs::current_path(error);
-    if(!error)
-    {
-        add_search_path(file_manager, current_path);
-        add_search_path(file_manager, current_path / "lang");
-    }
-    if(const auto source_path = path_from_file_uri(uri))
-    {
-        add_search_path(file_manager, source_path->parent_path());
-    }
-
-    for(const auto& path: search_paths)
-    {
-        add_search_path(file_manager, path);
-    }
+    configure_search_paths(file_manager, uri, search_paths);
 
     ld::context loader{file_manager};
     sema::env environment;
@@ -456,6 +459,7 @@ std::optional<hover_item> find_hover_info(
         root->declare_functions(type_context, environment);
         root->bind_constant_declarations(environment, constants);
         root->type_check(type_context, environment);
+        root->evaluate_constant_expressions(type_context, constants);
     }
     catch(const std::exception& analysis_error)
     {
@@ -475,6 +479,36 @@ std::optional<hover_item> find_hover_info(
               .label = function_signature(*function, type_context),
               .detail = "function",
               .kind = "function"};
+        }
+
+        if(target->get_id() == ast::node_identifier::access_expression)
+        {
+            const auto* access = target->as_access_expression();
+            const auto* rhs = access->get_right_expression();
+            if(rhs && rhs->is_named_expression())
+            {
+                const std::string member_name = rhs->as_named_expression()->get_name();
+                const auto owner_type = access->get_left_expression()
+                                          ? type_context.get_expression_type(*access->get_left_expression())
+                                          : std::nullopt;
+                const auto member_type = type_context.get_expression_type(*access);
+
+                std::string label = member_name;
+                if(owner_type.has_value())
+                {
+                    label = std::format(
+                      "{}.{}",
+                      display_type(*owner_type, type_context),
+                      member_name);
+                }
+
+                return hover_item{
+                  .label = std::move(label),
+                  .detail = member_type.has_value()
+                              ? display_type(*member_type, type_context)
+                              : std::string{},
+                  .kind = "field"};
+            }
         }
 
         if(target->is_call_expression())
@@ -499,6 +533,60 @@ std::optional<hover_item> find_hover_info(
                               .label = function_signature(*function, type_context),
                               .detail = "function",
                               .kind = "function"};
+                        }
+                    }
+
+                    if(const auto mod = environment.symbol_table.find(symbol->second.declaring_module);
+                       mod != environment.symbol_table.end()
+                       && !mod->second.qualified_name.empty())
+                    {
+                        if(const auto sl_path = resolve_module_source_path(file_manager, mod->second.qualified_name))
+                        {
+                            std::ifstream sl_file(*sl_path, std::ios::binary);
+                            std::string mod_source{
+                              std::istreambuf_iterator<char>(sl_file),
+                              std::istreambuf_iterator<char>()};
+                            if(!mod_source.empty())
+                            {
+                                const std::string mod_uri = file_uri_from_path(*sl_path);
+                                diag::context mod_diag;
+                                mod_diag.register_file(mod_uri, mod_source);
+                                try
+                                {
+                                    auto mod_tokens = slang::lexer::lex(mod_source);
+                                    slang::parser mod_parser;
+                                    mod_parser.parse(std::move(mod_tokens));
+                                    if(auto mod_root = mod_parser.get_ast())
+                                    {
+                                        ld::context mod_loader{file_manager};
+                                        sema::env mod_env;
+                                        const_::env mod_consts;
+                                        macro::env mod_macros;
+                                        ty::context mod_types{mod_diag, mod_uri};
+                                        co::context mod_col{mod_env};
+                                        rs::context mod_res{mod_env, mod_consts, mod_macros, mod_types, mod_diag, mod_uri};
+                                        mod_root->collect_names(mod_col);
+                                        mod_res.resolve_imports(mod_loader);
+                                        mod_root->resolve_names(mod_res);
+                                        mod_root->declare_types(mod_types, mod_env);
+                                        mod_root->define_types(mod_types);
+                                        mod_root->declare_functions(mod_types, mod_env);
+                                        if(const auto* mod_fn = find_function_in_ast(mod_root.get(), symbol->second.name))
+                                        {
+                                            return hover_item{
+                                              .label = function_signature(*mod_fn, mod_types),
+                                              .detail = "function",
+                                              .kind = "function",
+                                              .definition = lsp_location{
+                                                .uri = mod_uri,
+                                                .range = lsp_range{}}};
+                                        }
+                                    }
+                                }
+                                catch(const std::exception&)
+                                {
+                                }
+                            }
                         }
                     }
 
@@ -556,6 +644,105 @@ std::optional<hover_item> find_hover_info(
             if(const auto type_id = type_context.get_expression_type(*target))
             {
                 item.detail = type_context.to_string(*type_id);
+            }
+
+            if(item.kind == "const")
+            {
+                std::optional<const_::const_info> const_info;
+                if(const auto symbol_id = target->get_symbol_id())
+                {
+                    const_info = constants.get_const_info(*symbol_id);
+
+                    // If this is an imported constant and its .sl source is available, prefer source info.
+                    if(!const_info.has_value() || item.detail.empty())
+                    {
+                        const auto sym = environment.symbol_table.find(*symbol_id);
+                        if(sym != environment.symbol_table.end())
+                        {
+                            const auto mod = environment.symbol_table.find(sym->second.declaring_module);
+                            if(mod != environment.symbol_table.end()
+                               && !mod->second.qualified_name.empty())
+                            {
+                                if(const auto sl_path = resolve_module_source_path(file_manager, mod->second.qualified_name))
+                                {
+                                    std::ifstream sl_file(*sl_path, std::ios::binary);
+                                    std::string mod_source{
+                                      std::istreambuf_iterator<char>(sl_file),
+                                      std::istreambuf_iterator<char>()};
+                                    if(!mod_source.empty())
+                                    {
+                                        const std::string mod_uri = file_uri_from_path(*sl_path);
+                                        diag::context mod_diag;
+                                        mod_diag.register_file(mod_uri, mod_source);
+                                        try
+                                        {
+                                            auto mod_tokens = slang::lexer::lex(mod_source);
+                                            slang::parser mod_parser;
+                                            mod_parser.parse(std::move(mod_tokens));
+                                            if(auto mod_root = mod_parser.get_ast())
+                                            {
+                                                ld::context mod_loader{file_manager};
+                                                sema::env mod_env;
+                                                const_::env mod_consts;
+                                                macro::env mod_macros;
+                                                ty::context mod_types{mod_diag, mod_uri};
+                                                co::context mod_col{mod_env};
+                                                rs::context mod_res{mod_env, mod_consts, mod_macros, mod_types, mod_diag, mod_uri};
+                                                mod_root->collect_names(mod_col);
+                                                mod_res.resolve_imports(mod_loader);
+                                                mod_root->resolve_names(mod_res);
+                                                mod_root->declare_types(mod_types, mod_env);
+                                                mod_root->define_types(mod_types);
+                                                mod_root->declare_functions(mod_types, mod_env);
+                                                mod_root->bind_constant_declarations(mod_env, mod_consts);
+                                                mod_root->type_check(mod_types, mod_env);
+                                                mod_root->evaluate_constant_expressions(mod_types, mod_consts);
+                                                if(const auto* mod_const = find_constant_in_ast(mod_root.get(), sym->second.name))
+                                                {
+                                                    if(item.detail.empty())
+                                                    {
+                                                        if(const auto tid = mod_types.get_expression_type(*mod_const))
+                                                        {
+                                                            item.detail = mod_types.to_string(*tid);
+                                                        }
+                                                    }
+                                                    if(const auto mod_sid = mod_const->get_symbol_id())
+                                                    {
+                                                        if(auto info = mod_consts.get_const_info(*mod_sid))
+                                                        {
+                                                            const_info = info;
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        catch(const std::exception&)
+                                        {
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if(const_info.has_value())
+                {
+                    if(const auto formatted = format_const_value(*const_info))
+                    {
+                        if(item.detail.empty())
+                        {
+                            item.detail = std::format(
+                              "{} = {}",
+                              const_::to_string(const_info->type),
+                              *formatted);
+                        }
+                        else
+                        {
+                            item.detail += std::format(" = {}", *formatted);
+                        }
+                    }
+                }
             }
 
             return item;

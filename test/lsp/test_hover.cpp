@@ -18,8 +18,6 @@
 namespace
 {
 
-/* === Phase 6.2: Hover -- basic lookup === */
-
 TEST(hover, returns_type_for_variable)
 {
     std::string source = "const x: i32 = 42;";
@@ -64,7 +62,79 @@ TEST(hover, returns_none_for_unknown_position)
       "file:///test.sl", source, pos));
 }
 
-/* === Phase 6.2: Hover -- result formatting === */
+TEST(hover, returns_type_for_struct_member_and_array_length)
+{
+    std::string source =
+      "struct Inner {\n"
+      "    val: f32\n"
+      "};\n"
+      "struct Outer {\n"
+      "    inner: Inner\n"
+      "};\n"
+      "fn main(args: str[]) -> i32 {\n"
+      "    let o: Outer = Outer { inner: Inner { val: 1.5 as f32 } };\n"
+      "    let v: f32 = o.inner.val;\n"
+      "    return args.length;\n"
+      "}\n";
+
+    // Hover on 'inner' in 'o.inner.val' (line 8, col 19).
+    auto inner_hover = slang::lsp::find_hover_info(
+      "file:///test.sl", source, {.line = 8, .character = 19});
+    ASSERT_TRUE(inner_hover.has_value());
+    EXPECT_EQ(inner_hover->label, "Outer.inner");
+    EXPECT_EQ(inner_hover->detail, "Inner");
+    EXPECT_EQ(inner_hover->kind, "field");
+
+    // Hover on 'val' in 'o.inner.val' (line 8, col 25).
+    auto val_hover = slang::lsp::find_hover_info(
+      "file:///test.sl", source, {.line = 8, .character = 25});
+    ASSERT_TRUE(val_hover.has_value());
+    EXPECT_EQ(val_hover->label, "Inner.val");
+    EXPECT_EQ(val_hover->detail, "f32");
+    EXPECT_EQ(val_hover->kind, "field");
+
+    // Hover on 'length' in 'args.length' (line 9, col 16).
+    auto len_hover = slang::lsp::find_hover_info(
+      "file:///test.sl", source, {.line = 9, .character = 16});
+    ASSERT_TRUE(len_hover.has_value());
+    EXPECT_EQ(len_hover->label, "str[].length");
+    EXPECT_EQ(len_hover->detail, "i32");
+    EXPECT_EQ(len_hover->kind, "field");
+}
+
+TEST(hover, returns_constant_value_at_decl_and_usage)
+{
+    std::string source =
+      "const ANSWER: i32 = 42;\n"
+      "const GREETING: str = \"hi\";\n"
+      "fn main() -> i32 {\n"
+      "    return ANSWER;\n"
+      "}\n";
+
+    // Declaration of ANSWER (line 0, col 6).
+    auto decl_hover = slang::lsp::find_hover_info(
+      "file:///test.sl", source, {.line = 0, .character = 6});
+    ASSERT_TRUE(decl_hover.has_value());
+    EXPECT_EQ(decl_hover->label, "ANSWER");
+    EXPECT_EQ(decl_hover->kind, "const");
+    EXPECT_EQ(decl_hover->detail, "i32 = 42");
+
+    // Declaration of GREETING (line 1, col 6).
+    auto str_hover = slang::lsp::find_hover_info(
+      "file:///test.sl", source, {.line = 1, .character = 6});
+    ASSERT_TRUE(str_hover.has_value());
+    EXPECT_EQ(str_hover->label, "GREETING");
+    EXPECT_EQ(str_hover->kind, "const");
+    EXPECT_EQ(str_hover->detail, "str = \"hi\"");
+
+    // Usage of ANSWER (line 3, col 11).
+    auto use_hover = slang::lsp::find_hover_info(
+      "file:///test.sl", source, {.line = 3, .character = 11});
+    ASSERT_TRUE(use_hover.has_value());
+    EXPECT_EQ(use_hover->label, "ANSWER");
+    EXPECT_EQ(use_hover->kind, "const");
+    EXPECT_EQ(use_hover->detail, "i32 = 42");
+}
 
 TEST(hover, format_empty_result)
 {

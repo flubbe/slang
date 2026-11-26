@@ -388,7 +388,7 @@ class lsp_server
           .line = static_cast<std::size_t>(line.value()),
           .character = static_cast<std::size_t>(character.value())};
 
-        auto completions = slang::lsp::get_completions(uri_str, doc->text, pos);
+        auto completions = slang::lsp::get_completions(uri_str, doc->text, pos, searchPaths);
         transport.send_message(
           slang::lsp::make_response(*msg.id, slang::lsp::format_completion_result(completions)));
     }
@@ -466,6 +466,10 @@ class lsp_server
         {
             // Acknowledged notifications without additional action.
         }
+        else if(msg.method == "workspace/didChangeConfiguration")
+        {
+            handle_did_change_configuration(msg);
+        }
         else
         {
             std::println(
@@ -532,11 +536,12 @@ class lsp_server
             if(text.error() == simdjson::error_code::SUCCESS)
             {
                 std::string text_str{text.value()};
-                docs.did_change(uri_str, ver_val, text_str);
-
-                auto diagnostics = slang::lsp::compute_diagnostics(uri_str, text_str);
-                transport.send_message(
-                  slang::lsp::format_publish_diagnostics(uri_str, diagnostics));
+                if(docs.did_change(uri_str, ver_val, text_str))
+                {
+                    auto diagnostics = slang::lsp::compute_diagnostics(uri_str, text_str);
+                    transport.send_message(
+                      slang::lsp::format_publish_diagnostics(uri_str, diagnostics));
+                }
                 break;
             }
         }
@@ -712,7 +717,11 @@ void lsp::invoke(const std::vector<std::string>& args)
     if(result.count("server") > 0)
     {
         lsp_server server;
-        server.serve();
+        const int rc = server.serve();
+        if(rc != 0)
+        {
+            std::exit(rc);
+        }
     }
     else
     {

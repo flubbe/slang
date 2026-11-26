@@ -18,8 +18,6 @@
 namespace
 {
 
-/* === Phase 6.1: Document symbols === */
-
 TEST(navigation, extract_document_symbols)
 {
     const std::string source =
@@ -76,8 +74,6 @@ TEST(navigation, extract_document_symbols)
       json.find("\"name\":\"sum\"") != std::string::npos);
 }
 
-/* === Phase 6.1: Go to definition === */
-
 TEST(navigation, find_definition_basic)
 {
     const std::string source =
@@ -126,8 +122,6 @@ TEST(navigation, find_definition_cross_file)
                                   pos, {});
     EXPECT_FALSE(result.has_value());
 }
-
-/* === Phase 6.1: Find references === */
 
 TEST(navigation, find_references_with_declaration)
 {
@@ -188,14 +182,10 @@ TEST(navigation, reference_json_serialization)
                 != std::string::npos);
 }
 
-/* === Phase 6.1: fullRange ⊇ selectionRange === */
-
 TEST(navigation, document_symbols_full_range_contains_selection_range)
 {
-    // Reproduces the bug: "selectionRange must be contained in fullRange"
-    // reported by the VS Code language client.
-    // See: https://microsoft.github.io/language-serverSpecification/protocols/LSP/, section
-    // DocumentSymbol, where fullRange must contain selectionRange.
+    // The LSP requires selectionRange to be contained in range.
+    // See DocumentSymbol in the LSP specification.
     const std::string source =
       "fn add(a: i32, b: i32) -> i32 {\n"
       "    let sum: i32 = a + b;\n"
@@ -210,21 +200,21 @@ TEST(navigation, document_symbols_full_range_contains_selection_range)
 
     constexpr auto check = [&](const slang::lsp::document_symbol& sym)
     {
-        // fullRange.start <= selectionRange.start
+        // range.start <= selectionRange.start
         EXPECT_LE(sym.range.start.line, sym.selection_range.start.line)
-          << "fullRange.start before selectionRange.start for '" << sym.name << "'";
+          << "range.start before selectionRange.start for '" << sym.name << "'";
         if(sym.range.start.line == sym.selection_range.start.line)
         {
             EXPECT_LE(sym.range.start.character, sym.selection_range.start.character)
-              << "fullRange.start before selectionRange.start for '" << sym.name << "'";
+              << "range.start before selectionRange.start for '" << sym.name << "'";
         }
-        // selectionRange.end <= fullRange.end
+        // selectionRange.end <= range.end
         EXPECT_LE(sym.selection_range.end.line, sym.range.end.line)
-          << "selectionRange.end after fullRange.end for '" << sym.name << "'";
+          << "selectionRange.end after range.end for '" << sym.name << "'";
         if(sym.selection_range.end.line == sym.range.end.line)
         {
             EXPECT_LE(sym.selection_range.end.character, sym.range.end.character)
-              << "selectionRange.end after fullRange.end for '" << sym.name << "'";
+              << "selectionRange.end after range.end for '" << sym.name << "'";
         }
     };
 
