@@ -22,7 +22,7 @@ namespace
 TEST(json_rpc, parse_valid_request)
 {
     const std::string json =
-        R"({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"processId":1234}})";
+      R"({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"processId":1234}})";
     const auto msg = slang::lsp::parse_message(json);
 
     EXPECT_TRUE(msg.is_valid());
@@ -40,7 +40,7 @@ TEST(json_rpc, parse_valid_request)
 TEST(json_rpc, parse_valid_notification)
 {
     const std::string json =
-        R"({"jsonrpc":"2.0","method":"initialized","params":{}})";
+      R"({"jsonrpc":"2.0","method":"initialized","params":{}})";
     const auto msg = slang::lsp::parse_message(json);
 
     EXPECT_TRUE(msg.is_valid());
@@ -56,7 +56,7 @@ TEST(json_rpc, handle_integer_ids)
     // Zero
     {
         const auto msg = slang::lsp::parse_message(
-            R"({"jsonrpc":"2.0","id":0,"method":"test"})");
+          R"({"jsonrpc":"2.0","id":0,"method":"test"})");
         EXPECT_TRUE(msg.is_valid());
         EXPECT_TRUE(msg.id.has_value());
         EXPECT_TRUE(std::holds_alternative<std::int64_t>(*msg.id));
@@ -65,7 +65,7 @@ TEST(json_rpc, handle_integer_ids)
     // INT64_MAX
     {
         const auto msg = slang::lsp::parse_message(
-            R"({"jsonrpc":"2.0","id":9223372036854775807,"method":"test"})");
+          R"({"jsonrpc":"2.0","id":9223372036854775807,"method":"test"})");
         EXPECT_TRUE(msg.is_valid());
         EXPECT_TRUE(msg.id.has_value());
         EXPECT_TRUE(std::holds_alternative<std::int64_t>(*msg.id));
@@ -74,7 +74,7 @@ TEST(json_rpc, handle_integer_ids)
     // Negative
     {
         const auto msg = slang::lsp::parse_message(
-            R"({"jsonrpc":"2.0","id":-42,"method":"test"})");
+          R"({"jsonrpc":"2.0","id":-42,"method":"test"})");
         EXPECT_TRUE(msg.is_valid());
         EXPECT_TRUE(msg.id.has_value());
         EXPECT_TRUE(std::holds_alternative<std::int64_t>(*msg.id));
@@ -85,7 +85,7 @@ TEST(json_rpc, handle_integer_ids)
 TEST(json_rpc, handle_string_ids)
 {
     const auto msg = slang::lsp::parse_message(
-        R"({"jsonrpc":"2.0","id":"request-abc-123","method":"test"})");
+      R"({"jsonrpc":"2.0","id":"request-abc-123","method":"test"})");
     EXPECT_TRUE(msg.is_valid());
     EXPECT_TRUE(msg.is_request());
     EXPECT_TRUE(msg.id.has_value());
@@ -98,7 +98,7 @@ TEST(json_rpc, handle_string_ids)
 TEST(json_rpc, handle_missing_jsonrpc_field)
 {
     const auto msg = slang::lsp::parse_message(
-        R"({"id":1,"method":"test"})");
+      R"({"id":1,"method":"test"})");
     EXPECT_FALSE(msg.is_valid());
     EXPECT_EQ(msg.error.code, slang::lsp::error_code::invalid_request);
 }
@@ -106,7 +106,7 @@ TEST(json_rpc, handle_missing_jsonrpc_field)
 TEST(json_rpc, handle_invalid_jsonrpc_version)
 {
     const auto msg = slang::lsp::parse_message(
-        R"({"jsonrpc":"1.0","id":1,"method":"test"})");
+      R"({"jsonrpc":"1.0","id":1,"method":"test"})");
     EXPECT_FALSE(msg.is_valid());
     EXPECT_EQ(msg.error.code, slang::lsp::error_code::invalid_request);
 }
@@ -114,7 +114,7 @@ TEST(json_rpc, handle_invalid_jsonrpc_version)
 TEST(json_rpc, handle_non_string_jsonrpc_version)
 {
     const auto msg = slang::lsp::parse_message(
-        R"({"jsonrpc":2.0,"id":1,"method":"test"})");
+      R"({"jsonrpc":2.0,"id":1,"method":"test"})");
     EXPECT_FALSE(msg.is_valid());
     EXPECT_EQ(msg.error.code, slang::lsp::error_code::invalid_request);
 }
@@ -122,7 +122,7 @@ TEST(json_rpc, handle_non_string_jsonrpc_version)
 TEST(json_rpc, handle_missing_method)
 {
     const auto msg = slang::lsp::parse_message(
-        R"({"jsonrpc":"2.0","id":1})");
+      R"({"jsonrpc":"2.0","id":1})");
     EXPECT_FALSE(msg.is_valid());
     EXPECT_EQ(msg.error.code, slang::lsp::error_code::invalid_request);
 }
@@ -130,7 +130,7 @@ TEST(json_rpc, handle_missing_method)
 TEST(json_rpc, handle_non_string_method)
 {
     const auto msg = slang::lsp::parse_message(
-        R"({"jsonrpc":"2.0","id":1,"method":123})");
+      R"({"jsonrpc":"2.0","id":1,"method":123})");
     EXPECT_FALSE(msg.is_valid());
     EXPECT_EQ(msg.error.code, slang::lsp::error_code::invalid_request);
 }
@@ -138,7 +138,7 @@ TEST(json_rpc, handle_non_string_method)
 TEST(json_rpc, handle_boolean_id)
 {
     const auto msg = slang::lsp::parse_message(
-        R"({"jsonrpc":"2.0","id":true,"method":"test"})");
+      R"({"jsonrpc":"2.0","id":true,"method":"test"})");
     EXPECT_FALSE(msg.is_valid());
     EXPECT_EQ(msg.error.code, slang::lsp::error_code::invalid_request);
 }
@@ -146,7 +146,7 @@ TEST(json_rpc, handle_boolean_id)
 TEST(json_rpc, handle_array_id)
 {
     const auto msg = slang::lsp::parse_message(
-        R"({"jsonrpc":"2.0","id":[1,2],"method":"test"})");
+      R"({"jsonrpc":"2.0","id":[1,2],"method":"test"})");
     EXPECT_FALSE(msg.is_valid());
     EXPECT_EQ(msg.error.code, slang::lsp::error_code::invalid_request);
 }
@@ -154,7 +154,7 @@ TEST(json_rpc, handle_array_id)
 TEST(json_rpc, handle_object_id)
 {
     const auto msg = slang::lsp::parse_message(
-        R"({"jsonrpc":"2.0","id":{"a":1},"method":"test"})");
+      R"({"jsonrpc":"2.0","id":{"a":1},"method":"test"})");
     EXPECT_FALSE(msg.is_valid());
     EXPECT_EQ(msg.error.code, slang::lsp::error_code::invalid_request);
 }
@@ -162,7 +162,7 @@ TEST(json_rpc, handle_object_id)
 TEST(json_rpc, handle_non_structured_params)
 {
     const auto msg = slang::lsp::parse_message(
-        R"({"jsonrpc":"2.0","id":1,"method":"test","params":"invalid"})");
+      R"({"jsonrpc":"2.0","id":1,"method":"test","params":"invalid"})");
     EXPECT_FALSE(msg.is_valid());
     EXPECT_EQ(msg.error.code, slang::lsp::error_code::invalid_request);
 }
@@ -170,7 +170,7 @@ TEST(json_rpc, handle_non_structured_params)
 TEST(json_rpc, handle_non_object_root)
 {
     const auto msg = slang::lsp::parse_message(
-        R"(["jsonrpc", "2.0"])");
+      R"(["jsonrpc", "2.0"])");
     EXPECT_FALSE(msg.is_valid());
     EXPECT_EQ(msg.error.code, slang::lsp::error_code::invalid_request);
 }
@@ -180,7 +180,7 @@ TEST(json_rpc, handle_non_object_root)
 TEST(json_rpc, handle_incomplete_json)
 {
     const auto msg = slang::lsp::parse_message(
-        R"({"jsonrpc":"2.0")");
+      R"({"jsonrpc":"2.0")");
     EXPECT_FALSE(msg.is_valid());
     EXPECT_EQ(msg.error.code, slang::lsp::error_code::parse_error);
 }
@@ -188,7 +188,7 @@ TEST(json_rpc, handle_incomplete_json)
 TEST(json_rpc, handle_trailing_garbage)
 {
     const auto msg = slang::lsp::parse_message(
-        R"({"jsonrpc":"2.0", "id": })");
+      R"({"jsonrpc":"2.0", "id": })");
     EXPECT_FALSE(msg.is_valid());
     EXPECT_EQ(msg.error.code, slang::lsp::error_code::parse_error);
 }
@@ -198,7 +198,7 @@ TEST(json_rpc, handle_trailing_garbage)
 TEST(json_rpc, parse_response_with_result)
 {
     const std::string json =
-        R"({"jsonrpc":"2.0","id":1,"result":{"capabilities":{}}})";
+      R"({"jsonrpc":"2.0","id":1,"result":{"capabilities":{}}})";
     const auto msg = slang::lsp::parse_message(json);
     EXPECT_TRUE(msg.is_valid());
     EXPECT_TRUE(msg.is_response());
@@ -212,7 +212,7 @@ TEST(json_rpc, parse_response_with_result)
 TEST(json_rpc, parse_response_with_error)
 {
     const std::string json =
-        R"({"jsonrpc":"2.0","id":2,"error":{"code":-32601,"message":"Method not found"}})";
+      R"({"jsonrpc":"2.0","id":2,"error":{"code":-32601,"message":"Method not found"}})";
     const auto msg = slang::lsp::parse_message(json);
     EXPECT_TRUE(msg.is_valid());
     EXPECT_TRUE(msg.is_response());
@@ -224,7 +224,7 @@ TEST(json_rpc, parse_response_with_error)
 TEST(json_rpc, format_response_integer_id)
 {
     const std::string res =
-        slang::lsp::make_response(42, R"({"capabilities":{}})");
+      slang::lsp::make_response(42, R"({"capabilities":{}})");
     const auto parsed = slang::lsp::parse_message(res);
     EXPECT_TRUE(parsed.is_valid());
     EXPECT_TRUE(parsed.is_response());
@@ -248,9 +248,9 @@ TEST(json_rpc, format_response_string_id)
 TEST(json_rpc, format_error_response)
 {
     const std::string res =
-        slang::lsp::make_error_response(
-            10, slang::lsp::error_code::method_not_found,
-            "Method not found");
+      slang::lsp::make_error_response(
+        10, slang::lsp::error_code::method_not_found,
+        "Method not found");
     const auto parsed = slang::lsp::parse_message(res);
     EXPECT_TRUE(parsed.is_valid());
     EXPECT_TRUE(parsed.is_response());
@@ -262,9 +262,9 @@ TEST(json_rpc, format_error_response)
 TEST(json_rpc, format_error_response_null_id)
 {
     const std::string res =
-        slang::lsp::make_error_response(
-            std::nullopt, slang::lsp::error_code::parse_error,
-            "Parse error");
+      slang::lsp::make_error_response(
+        std::nullopt, slang::lsp::error_code::parse_error,
+        "Parse error");
     EXPECT_TRUE(res.find("\"id\":null") != std::string::npos);
     EXPECT_TRUE(res.find("\"code\":-32700") != std::string::npos);
 }
@@ -272,8 +272,8 @@ TEST(json_rpc, format_error_response_null_id)
 TEST(json_rpc, format_notification)
 {
     const std::string notif =
-        slang::lsp::make_notification(
-            "custom/notification", R"({"status":"ok"})");
+      slang::lsp::make_notification(
+        "custom/notification", R"({"status":"ok"})");
     const auto parsed = slang::lsp::parse_message(notif);
     EXPECT_TRUE(parsed.is_valid());
     EXPECT_TRUE(parsed.is_notification());

@@ -56,7 +56,7 @@ TEST(document_store, change_nonexistent_document_fails)
 {
     slang::lsp::document_store store;
     EXPECT_FALSE(
-        store.did_change("file:///nonexistent.sl", 1, "text"));
+      store.did_change("file:///nonexistent.sl", 1, "text"));
 }
 
 TEST(document_store, close_removes_entry)
